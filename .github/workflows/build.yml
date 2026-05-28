@@ -2,31 +2,14 @@ name: Build
 
 on:
   push:
-    branches: [main]
+    branches: [master, main]
     tags: ['v*']
   pull_request:
-    branches: [main]
+    branches: [master, main]
 
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - os: ubuntu-latest
-            arch: x64
-            target: linux
-            artifact_name: linux-amd64-deb
-          - os: ubuntu-22.04-arm
-            arch: arm64
-            target: linux
-            artifact_name: linux-arm64-deb
-          - os: windows-latest
-            arch: x64
-            target: win
-            artifact_name: windows-amd64-nsis
-
-    runs-on: ${{ matrix.os }}
-
+  build-linux-deb:
+    runs-on: ubuntu-latest
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -40,26 +23,51 @@ jobs:
         run: npm ci
 
       - name: Build Linux amd64 deb
-        if: matrix.target == 'linux' && matrix.arch == 'x64'
         run: npx electron-builder --linux deb --x64 -p never
 
       - name: Build Linux arm64 deb
-        if: matrix.target == 'linux' && matrix.arch == 'arm64'
         run: npx electron-builder --linux deb --arm64 -p never
 
-      - name: Build Windows amd64 NSIS
-        if: matrix.target == 'win'
-        run: npx electron-builder --win nsis --x64 -p never
-
-      - name: Upload artifacts
+      - name: Upload amd64 deb
         uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.artifact_name }}
-          path: dist/*.{deb,exe}
+          name: linux-amd64-deb
+          path: dist/*amd64.deb
+          if-no-files-found: error
+
+      - name: Upload arm64 deb
+        uses: actions/upload-artifact@v4
+        with:
+          name: linux-arm64-deb
+          path: dist/*arm64.deb
+          if-no-files-found: error
+
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build Windows amd64 NSIS
+        run: npx electron-builder --win nsis --x64 -p never
+
+      - name: Upload Windows exe
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-amd64-nsis
+          path: dist/*.exe
           if-no-files-found: error
 
   release:
-    needs: build
+    needs: [build-linux-deb, build-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
