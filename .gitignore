@@ -17,7 +17,8 @@ npminstall-debug.log
 Thumbs.db
 
 # IDE
-.vscode/
+.vscode/*
+!.vscode/launch.json
 .idea/
 
 # Environment
