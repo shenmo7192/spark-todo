@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Spark Todo 工单系统</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="app">
+    <header class="header">
+      <h1>🔥 Spark Todo 工单台账</h1>
+      <div class="header-actions">
+        <span class="current-month" id="currentMonth"></span>
+        <button class="btn btn-export" id="btnExport">📥 导出Excel台账</button>
+      </div>
+    </header>
+
+    <div class="tab-bar" id="tabBar">
+      <!-- Tabs injected by JS -->
+      <button class="tab tab-add" id="btnAddCategory" title="添加分类">+</button>
+    </div>
+
+    <div class="toolbar">
+      <button class="btn btn-primary" id="btnAddTask">+ 新建任务</button>
+      <div class="filter-info" id="filterInfo"></div>
+    </div>
+
+    <div class="task-list" id="taskList">
+      <!-- Tasks injected by JS -->
+    </div>
+  </div>
+
+  <!-- Modal: Task Detail -->
+  <div class="modal-overlay" id="modalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2 id="modalTitle">任务详情</h2>
+        <button class="btn-close" id="btnCloseModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <input type="hidden" id="taskId">
+        <div class="form-row">
+          <label>任务名称</label>
+          <input type="text" id="taskTitle" class="input">
+        </div>
+
+        <div class="form-row">
+          <label>文本描述 / 工作思路 / STAR总结</label>
+          <textarea id="taskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
+        </div>
+
+        <div class="form-row" id="routinePanel" style="display:none;">
+          <label>📋 本月填报 (<span id="routineLabelMonth"></span>)</label>
+          <div class="routine-inputs">
+            <input type="number" id="routineQty" class="input input-short" placeholder="数量">
+            <button class="btn btn-primary" id="btnSaveRoutine">保存填报</button>
+          </div>
+          <div class="routine-info" id="routineInfo"></div>
+          <div id="backfillPanel" style="display:none;margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">
+            <label style="color:var(--danger);">⚠️ 补填上月 (<span id="backfillLabelMonth"></span>)</label>
+            <div class="routine-inputs">
+              <input type="number" id="backfillQty" class="input input-short" placeholder="数量">
+              <button class="btn btn-danger" id="btnBackfillRoutine">补填上月</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" id="statusPanel">
+          <label>当前状态</label>
+          <div class="status-bar">
+            <span class="status-badge" id="statusBadge">已创建</span>
+            <div class="status-actions">
+              <button class="btn btn-sm" id="btnStatusCreated">已创建</button>
+              <button class="btn btn-sm" id="btnStatusProgress">进行中</button>
+              <button class="btn btn-sm" id="btnStatusComplete">直接完成</button>
+            </div>
+          </div>
+        </div>
+
+        <div class="form-row" id="stagePanel">
+          <label>阶段进度 (最新在上)</label>
+          <div class="stage-list" id="stageList"></div>
+          <div class="stage-add">
+            <input type="text" id="newStageNote" class="input" placeholder="阶段备注 / 状态更新内容">
+            <button class="btn btn-primary" id="btnAddStage">+ 新增阶段</button>
+          </div>
+        </div>
+
+        <div class="form-row times">
+          <div class="time-item"><strong>创建时间:</strong> <span id="timeCreated">-</span></div>
+          <div class="time-item"><strong>开始时间:</strong> <span id="timeStarted">-</span></div>
+          <div class="time-item"><strong>结束时间:</strong> <span id="timeCompleted">-</span></div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-danger" id="btnDeleteTask">🗑 删除任务</button>
+        <button class="btn btn-primary" id="btnSaveTask">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Category -->
+  <div class="modal-overlay" id="catModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>添加分类</h2>
+        <button class="btn-close" id="btnCloseCatModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>分类名称</label>
+          <input type="text" id="catName" class="input">
+        </div>
+        <div class="form-row">
+          <label>
+            <input type="checkbox" id="catIsRoutine"> 日常工作 (每月自动刷新)
+          </label>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnSaveCategory">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Routine Reminder -->
+  <div class="modal-overlay" id="remindModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>⏰ 上月日常工作未填报</h2>
+      </div>
+      <div class="modal-body">
+        <p id="remindText">以下日常工作上月未填报，请先补填：</p>
+        <ul id="remindList"></ul>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnRemindOk">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="renderer.js"></script>
+</body>
+</html>
