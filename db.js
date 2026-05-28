@@ -27,7 +27,8 @@ class ExcelDB {
 
   init() {
     if (fs.existsSync(this.filePath)) {
-      this.workbook = xlsx.readFile(this.filePath, { cellDates: true });
+      const buffer = fs.readFileSync(this.filePath);
+      this.workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
     } else {
       this.workbook = xlsx.utils.book_new();
       for (const name of Object.values(SHEETS)) {
@@ -50,7 +51,8 @@ class ExcelDB {
   save() {
     const dir = path.dirname(this.filePath);
     if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-    xlsx.writeFile(this.workbook, this.filePath);
+    const buffer = xlsx.write(this.workbook, { type: 'buffer', bookType: 'xlsx' });
+    fs.writeFileSync(this.filePath, buffer);
   }
 
   _getSheet(name) {
