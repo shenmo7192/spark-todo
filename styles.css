@@ -86,6 +86,11 @@ body {
 .status-routine { background: #e0e7ff; color: #3730a3; }
 
 .task-meta { font-size: 12px; color: var(--text-secondary); margin-bottom: 4px; }
+.task-latest-note {
+  font-size: 12px; color: var(--primary); margin-top: 4px;
+  background: #eef2ff; padding: 3px 8px; border-radius: 4px;
+  word-break: break-word; line-height: 1.4;
+}
 .task-progress { display: flex; align-items: center; gap: 8px; font-size: 12px; margin-top: 4px; }
 .progress-bar {
   flex: 1; height: 6px; background: var(--border); border-radius: 3px; overflow: hidden;
@@ -185,9 +190,18 @@ body {
 .stage-note { font-size: 14px; word-break: break-word; }
 .stage-time { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
 .stage-progress {
-  font-weight: 700; color: var(--primary); font-size: 16px; min-width: 52px;
-  text-align: right; padding-left: 12px;
+  font-weight: 700; font-size: 15px; min-width: 40px;
+  text-align: right; padding-left: 12px; line-height: 1;
 }
+.stage-progress.filled { color: var(--success); }
+.stage-progress.empty { color: var(--text-secondary); }
+.btn-stage-delete {
+  width: 20px; height: 20px; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff; border: none; border-radius: 50%;
+  font-size: 11px; cursor: pointer; margin-left: 8px; flex-shrink: 0; display: flex;
+  opacity: 0; transition: opacity .15s; line-height: 1;
+}
+.stage-item:hover .btn-stage-delete { opacity: 1; }
 
 .stage-add { display: flex; gap: 8px; }
 .stage-add .input { flex: 1; }
@@ -217,3 +231,63 @@ body {
 /* Reminder modal */
 #remindList { padding-left: 20px; line-height: 1.8; }
 #remindList li { font-size: 14px; }
+
+/* Month select */
+.month-select {
+  font-size: 14px; color: var(--text);
+  background: var(--card); padding: 6px 10px; border-radius: 6px;
+  border: 1px solid var(--border); cursor: pointer;
+}
+.month-select:focus { outline: none; border-color: var(--primary); }
+
+/* Bulk bar */
+.bulk-bar {
+  display: flex; align-items: center; gap: 8px;
+  background: var(--card); padding: 6px 12px; border-radius: 6px;
+  border: 1px solid var(--border); box-shadow: var(--shadow);
+}
+.bulk-bar span { font-size: 13px; color: var(--text-secondary); }
+
+/* Path input */
+.path-input { display: flex; gap: 8px; align-items: center; }
+.path-input .input { flex: 1; }
+
+/* Task card actions */
+.card-actions {
+  display: flex; gap: 6px; margin-top: 10px; padding-top: 10px;
+  border-top: 1px dashed var(--border); align-items: center;
+}
+.card-actions .checkbox-wrap {
+  display: flex; align-items: center; gap: 4px; margin-right: 4px;
+}
+.card-actions .checkbox-wrap input { cursor: pointer; }
+.card-actions .checkbox-wrap label {
+  font-size: 11px; color: var(--text-secondary); cursor: pointer;
+}
+.card-actions .btn-action {
+  padding: 3px 8px; font-size: 11px; border-radius: 4px;
+  background: var(--bg); border: 1px solid var(--border);
+  color: var(--text); cursor: pointer; transition: background .15s;
+}
+.card-actions .btn-action:hover { background: #e5e7eb; }
+.card-actions .btn-action.complete { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+.card-actions .btn-action.complete:hover { background: #a7f3d0; }
+.card-actions .btn-action.next { background: #dbeafe; color: #1e40af; border-color: #bfdbfe; }
+.card-actions .btn-action.next:hover { background: #bfdbfe; }
+.card-actions .btn-action.delete { background: #fee2e2; color: #991b1b; border-color: #fecaca; }
+.card-actions .btn-action.delete:hover { background: #fecaca; }
+
+/* Tab delete */
+.tab-wrap { display: flex; align-items: center; position: relative; }
+.tab-delete {
+  display: none; position: absolute; right: 2px; top: 2px;
+  width: 16px; height: 16px; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff; border: none; border-radius: 50%;
+  font-size: 10px; cursor: pointer; z-index: 2;
+}
+.tab-wrap:hover .tab-delete { display: flex; }
+.tab-wrap .tab { padding-right: 22px; }
+
+/* Revert button */
+.btn-revert { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }
+.btn-revert:hover { background: #fde68a; }

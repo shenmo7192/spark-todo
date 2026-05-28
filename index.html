@@ -11,7 +11,7 @@
     <header class="header">
       <h1>🔥 Spark Todo 工单台账</h1>
       <div class="header-actions">
-        <span class="current-month" id="currentMonth"></span>
+        <select class="month-select" id="monthSelect"></select>
         <button class="btn btn-export" id="btnExport">📥 导出Excel台账</button>
       </div>
     </header>
@@ -23,6 +23,12 @@
 
     <div class="toolbar">
       <button class="btn btn-primary" id="btnAddTask">+ 新建任务</button>
+      <div class="bulk-bar" id="bulkBar" style="display:none;">
+        <span id="bulkCount">已选择 0 项</span>
+        <button class="btn btn-sm" id="btnBulkComplete">批量完成</button>
+        <button class="btn btn-sm btn-danger" id="btnBulkDelete">批量删除</button>
+        <button class="btn btn-sm" id="btnBulkCancel">取消</button>
+      </div>
       <div class="filter-info" id="filterInfo"></div>
     </div>
 
@@ -74,17 +80,18 @@
               <button class="btn btn-sm" id="btnStatusCreated">已创建</button>
               <button class="btn btn-sm" id="btnStatusProgress">进行中</button>
               <button class="btn btn-sm" id="btnStatusComplete">直接完成</button>
+              <button class="btn btn-sm btn-revert" id="btnStatusRevert" style="display:none;">↩ 退回进行中</button>
             </div>
           </div>
         </div>
 
         <div class="form-row" id="stagePanel">
           <label>阶段进度 (最新在上)</label>
-          <div class="stage-list" id="stageList"></div>
           <div class="stage-add">
-            <input type="text" id="newStageNote" class="input" placeholder="阶段备注 / 状态更新内容">
+            <input type="text" id="newStageNote" class="input" placeholder="阶段备注（可选，填写后即视为完成）">
             <button class="btn btn-primary" id="btnAddStage">+ 新增阶段</button>
           </div>
+          <div class="stage-list" id="stageList"></div>
         </div>
 
         <div class="form-row times">
@@ -136,6 +143,82 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btnRemindOk">知道了</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: New Task -->
+  <div class="modal-overlay" id="newTaskModalOverlay">
+    <div class="modal">
+      <div class="modal-header">
+        <h2>新建任务</h2>
+        <button class="btn-close" id="btnCloseNewTaskModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>任务名称</label>
+          <input type="text" id="newTaskTitle" class="input" placeholder="请输入任务名称">
+        </div>
+        <div class="form-row">
+          <label>文本描述 / 工作思路 / STAR总结</label>
+          <textarea id="newTaskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
+        </div>
+        <div class="form-row" id="newTaskStagePanel" style="display:none;">
+          <label>📝 初始阶段备注 (可选)</label>
+          <div class="stage-add">
+            <input type="text" id="newTaskStageNote" class="input" placeholder="初始阶段备注 / 状态更新内容">
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnConfirmNewTask">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Export Settings -->
+  <div class="modal-overlay" id="exportModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>导出Excel台账</h2>
+        <button class="btn-close" id="btnCloseExportModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>起始月份</label>
+          <select id="exportStartMonth" class="input"></select>
+        </div>
+        <div class="form-row">
+          <label>结束月份</label>
+          <select id="exportEndMonth" class="input"></select>
+        </div>
+        <div class="form-row">
+          <label>导出目录</label>
+          <div class="path-input">
+            <input type="text" id="exportDirPath" class="input" readonly placeholder="请选择导出目录">
+            <button class="btn" id="btnChooseExportDir">选择目录</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnConfirmExport">导出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Delete Confirm -->
+  <div class="modal-overlay" id="deleteModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>⚠️ 确认删除</h2>
+        <button class="btn-close" id="btnCloseDeleteModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="deleteConfirmText">确定删除该任务？此操作不可恢复。</p>
+      </div>
+      <div class="modal-footer">
+        <button class="btn" id="btnCancelDelete">取消</button>
+        <button class="btn btn-danger" id="btnConfirmDelete">删除</button>
       </div>
     </div>
   </div>

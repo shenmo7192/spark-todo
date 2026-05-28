@@ -55,6 +55,7 @@ function safeHandler(fn) {
 
 ipcMain.handle('db:getCategories', safeHandler(() => db.getCategories()));
 ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine) => db.addCategory(name, isRoutine)));
+ipcMain.handle('db:updateCategory', safeHandler((_, id, name, isRoutine) => db.updateCategory(id, name, isRoutine)));
 ipcMain.handle('db:deleteCategory', safeHandler((_, id) => db.deleteCategory(id)));
 
 ipcMain.handle('db:getTasks', safeHandler((_, categoryId, yearMonth) => db.getTasks(categoryId, yearMonth)));
@@ -66,6 +67,7 @@ ipcMain.handle('db:deleteTask', safeHandler((_, id) => db.deleteTask(id)));
 ipcMain.handle('db:getStages', safeHandler((_, taskId) => db.getStages(taskId)));
 ipcMain.handle('db:addStage', safeHandler((_, stage) => db.addStage(stage)));
 ipcMain.handle('db:updateStage', safeHandler((_, stage) => db.updateStage(stage)));
+ipcMain.handle('db:deleteStage', safeHandler((_, stageId) => db.deleteStage(stageId)));
 
 ipcMain.handle('db:getRoutineRecord', safeHandler((_, taskId, yearMonth) => db.getRoutineRecord(taskId, yearMonth)));
 ipcMain.handle('db:fillRoutine', safeHandler((_, record) => db.fillRoutine(record)));
@@ -73,6 +75,7 @@ ipcMain.handle('db:getLastMonthRoutine', safeHandler((_, taskId, yearMonth) => d
 ipcMain.handle('db:checkRoutineUnfilled', safeHandler((_, categoryId, yearMonth) => db.checkRoutineUnfilled(categoryId, yearMonth)));
 
 ipcMain.handle('db:getAllActiveMonths', safeHandler(() => db.getAllActiveMonths()));
+ipcMain.handle('db:carryOverTasks', safeHandler((_, targetYearMonth, categoryId) => db.carryOverTasks(targetYearMonth, categoryId)));
 
 ipcMain.handle('export:excel', async (_, targetPath) => {
   try {
@@ -86,4 +89,18 @@ ipcMain.handle('export:excel', async (_, targetPath) => {
 ipcMain.handle('dialog:showSaveDialog', async (_, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;
+});
+
+ipcMain.handle('dialog:showOpenDialog', async (_, options) => {
+  const result = await dialog.showOpenDialog(mainWindow, options);
+  return result;
+});
+
+ipcMain.handle('export:monthlyExcel', async (_, dirPath, startMonth, endMonth) => {
+  try {
+    await exporter.exportMonthly(dirPath, startMonth, endMonth);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
 });
