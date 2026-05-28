@@ -82,8 +82,13 @@ function populateExportMonthSelects() {
     endSel.appendChild(opt2);
   }
   if (allMonths.length > 0) {
-    startSel.value = allMonths[0];
-    endSel.value = allMonths[allMonths.length - 1];
+    if (allMonths.includes(currentYearMonth)) {
+      startSel.value = currentYearMonth;
+      endSel.value = currentYearMonth;
+    } else {
+      startSel.value = allMonths[0];
+      endSel.value = allMonths[allMonths.length - 1];
+    }
   }
 }
 
@@ -106,7 +111,7 @@ async function loadCategories() {
 function renderTabs() {
   const bar = $('tabBar');
   bar.innerHTML = '';
-  categories.forEach(cat => {
+  categories.forEach((cat, idx) => {
     const wrap = document.createElement('div');
     wrap.className = 'tab-wrap';
 
@@ -120,6 +125,34 @@ function renderTabs() {
       startTabRename(cat, btn);
     });
 
+    if (idx > 0) {
+      const leftBtn = document.createElement('button');
+      leftBtn.className = 'tab-arrow tab-arrow-left';
+      leftBtn.innerHTML = '◀';
+      leftBtn.title = '向左移动';
+      leftBtn.onclick = async (e) => {
+        e.stopPropagation();
+        await window.electronAPI.moveCategory(cat.id, -1);
+        await loadCategories();
+      };
+      wrap.appendChild(leftBtn);
+    }
+
+    if (idx < categories.length - 1) {
+      const rightBtn = document.createElement('button');
+      rightBtn.className = 'tab-arrow tab-arrow-right';
+      rightBtn.innerHTML = '▶';
+      rightBtn.title = '向右移动';
+      rightBtn.onclick = async (e) => {
+        e.stopPropagation();
+        await window.electronAPI.moveCategory(cat.id, 1);
+        await loadCategories();
+      };
+      wrap.appendChild(rightBtn);
+    }
+
+    wrap.appendChild(btn);
+
     const delBtn = document.createElement('button');
     delBtn.className = 'tab-delete';
     delBtn.innerHTML = '×';
@@ -131,7 +164,6 @@ function renderTabs() {
       }
     };
 
-    wrap.appendChild(btn);
     wrap.appendChild(delBtn);
     bar.appendChild(wrap);
   });
@@ -251,9 +283,12 @@ function renderTasks() {
       const filledCount = stages.filter(s => s.note && s.note.trim() !== '').length;
       let latestNoteHtml = '';
       if (stages.length > 0) {
-        const latestStage = stages[stages.length - 1];
-        const latestFilled = latestStage.note && latestStage.note.trim() !== '';
-        latestNoteHtml = `<div class="task-latest-note">📝 第${latestStage.stage_index}段: ${escapeHtml(latestStage.note || '无备注')}</div>`;
+        const newestFilledStage = [...stages].reverse().find(s => s.note && s.note.trim() !== '');
+        if (newestFilledStage) {
+          latestNoteHtml = `<div class="task-latest-note">📝 第${newestFilledStage.stage_index}段: ${escapeHtml(newestFilledStage.note)}</div>`;
+        } else if (task.description) {
+          latestNoteHtml = `<div class="task-latest-note">📝 ${escapeHtml(task.description)}</div>`;
+        }
       } else if (task.description) {
         latestNoteHtml = `<div class="task-latest-note">📝 ${escapeHtml(task.description)}</div>`;
       }

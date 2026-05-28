@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getCategories: () => ipcRenderer.invoke('db:getCategories'),
   addCategory: (name, isRoutine) => ipcRenderer.invoke('db:addCategory', name, isRoutine),
   updateCategory: (id, name, isRoutine) => ipcRenderer.invoke('db:updateCategory', id, name, isRoutine),
+  moveCategory: (id, direction) => ipcRenderer.invoke('db:moveCategory', id, direction),
   deleteCategory: (id) => ipcRenderer.invoke('db:deleteCategory', id),
 
   // Tasks

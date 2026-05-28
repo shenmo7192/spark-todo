@@ -46,8 +46,8 @@ class ExcelDB {
       }
       // Seed default categories
       this._appendRows(SHEETS.categories, [
-        [1, '日常工作', 1, 0, new Date().toISOString()],
-        [2, '其他工作', 0, 1, new Date().toISOString()]
+        [1, '工作任务', 0, 0, new Date().toISOString()],
+        [2, '日常工作', 1, 1, new Date().toISOString()]
       ]);
       this._setMeta('last_category_id', 2);
       this._setMeta('last_task_id', 0);
@@ -113,7 +113,7 @@ class ExcelDB {
   getCategories() {
     return this._sheetToJson(SHEETS.categories).map(r => ({
       id: r[0], name: r[1], is_routine: r[2], sort_order: r[3], created_at: r[4]
-    }));
+    })).sort((a, b) => a.sort_order - b.sort_order);
   }
 
   addCategory(name, isRoutine) {
@@ -131,6 +131,20 @@ class ExcelDB {
     if (idx < 0) return false;
     cats[idx].name = name;
     if (isRoutine !== undefined) cats[idx].is_routine = isRoutine ? 1 : 0;
+    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at]));
+    this.save();
+    return true;
+  }
+
+  moveCategory(id, direction) {
+    const cats = this.getCategories();
+    const idx = cats.findIndex(c => c.id === id);
+    if (idx < 0) return false;
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= cats.length) return false;
+    const tmp = cats[idx].sort_order;
+    cats[idx].sort_order = cats[targetIdx].sort_order;
+    cats[targetIdx].sort_order = tmp;
     this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at]));
     this.save();
     return true;

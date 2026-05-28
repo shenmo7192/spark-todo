@@ -279,6 +279,17 @@ body {
 
 /* Tab delete */
 .tab-wrap { display: flex; align-items: center; position: relative; }
+.tab-arrow {
+  display: none; position: absolute; top: 50%; transform: translateY(-50%);
+  width: 18px; height: 18px; align-items: center; justify-content: center;
+  background: var(--bg); color: var(--text-secondary); border: 1px solid var(--border);
+  border-radius: 4px; font-size: 9px; cursor: pointer; z-index: 1; padding: 0;
+  transition: background .15s, color .15s;
+}
+.tab-arrow:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
+.tab-arrow-left { left: 2px; }
+.tab-arrow-right { right: 18px; }
+.tab-wrap:hover .tab-arrow { display: flex; }
 .tab-delete {
   display: none; position: absolute; right: 2px; top: 2px;
   width: 16px; height: 16px; align-items: center; justify-content: center;
@@ -286,7 +297,7 @@ body {
   font-size: 10px; cursor: pointer; z-index: 2;
 }
 .tab-wrap:hover .tab-delete { display: flex; }
-.tab-wrap .tab { padding-right: 22px; }
+.tab-wrap .tab { padding-left: 24px; padding-right: 40px; }
 
 /* Revert button */
 .btn-revert { background: #fef3c7; color: #92400e; border: 1px solid #fde68a; }

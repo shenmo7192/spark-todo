@@ -56,6 +56,7 @@ function safeHandler(fn) {
 ipcMain.handle('db:getCategories', safeHandler(() => db.getCategories()));
 ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine) => db.addCategory(name, isRoutine)));
 ipcMain.handle('db:updateCategory', safeHandler((_, id, name, isRoutine) => db.updateCategory(id, name, isRoutine)));
+ipcMain.handle('db:moveCategory', safeHandler((_, id, direction) => db.moveCategory(id, direction)));
 ipcMain.handle('db:deleteCategory', safeHandler((_, id) => db.deleteCategory(id)));
 
 ipcMain.handle('db:getTasks', safeHandler((_, categoryId, yearMonth) => db.getTasks(categoryId, yearMonth)));

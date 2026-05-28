@@ -114,60 +114,62 @@ class Exporter {
     }
 
     for (let i = 0; i < stages.length; i++) {
-      const s = stages[i];
-      const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
-      const stageUpdatedYm = s.updated_at ? s.updated_at.substring(0, 7) : stageCreatedYm;
-      const stageIndex = this._findMonthIndex(ym, allYearMonths);
+        const s = stages[i];
+        const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
+        const stageUpdatedYm = s.updated_at ? s.updated_at.substring(0, 7) : stageCreatedYm;
+        const stageIndex = this._findMonthIndex(ym, allYearMonths);
 
-      if (!stageCreatedYm) continue;
-      if (ym < stageCreatedYm) continue;
+        if (!stageCreatedYm) continue;
+        if (ym < stageCreatedYm) continue;
 
-      if (taskEndYm && ym > taskEndYm) continue;
+        if (taskEndYm && ym > taskEndYm) continue;
 
-      let effectiveNote = s.note || '';
-      let effectiveProgress = s.progress_value;
-      let effectiveUpdatedAt = s.updated_at || s.created_at;
+        let effectiveNote = s.note || '';
+        let effectiveUpdatedAt = s.updated_at || s.created_at;
 
-      const isStageCreatedThisMonth = (stageCreatedYm === ym);
-      const isStageUpdatedThisMonth = (stageUpdatedYm === ym) && (stageCreatedYm !== ym);
+        const isStageCreatedThisMonth = (stageCreatedYm === ym);
+        const isStageUpdatedThisMonth = (stageUpdatedYm === ym) && (stageCreatedYm !== ym);
 
-      if (!isStageCreatedThisMonth && !isStageUpdatedThisMonth) {
-        const hasNewerStage = stages.some((ns, nj) =>
-          nj > i && ns.created_at && ns.created_at.substring(0, 7) <= ym
-        );
-        if (hasNewerStage) {
-          continue;
-        }
-
-        if (ym > stageCreatedYm) {
-          const nextStage = stages.find((ns, nj) =>
-            nj > i && ns.created_at && ns.created_at.substring(0, 7) > stageCreatedYm
+        if (!isStageCreatedThisMonth && !isStageUpdatedThisMonth) {
+          const hasNewerStage = stages.some((ns, nj) =>
+            nj > i && ns.created_at && ns.created_at.substring(0, 7) <= ym
           );
+          if (hasNewerStage) {
+            continue;
+          }
 
-          if (taskCompleted) {
-            effectiveNote = `[跨月延续] ${s.note || ''}`;
-            effectiveUpdatedAt = task.completed_at;
-          } else {
-            effectiveNote = `[跨月延续] ${s.note || ''}`;
+          if (ym > stageCreatedYm) {
+            const nextStage = stages.find((ns, nj) =>
+              nj > i && ns.created_at && ns.created_at.substring(0, 7) > stageCreatedYm
+            );
+
+            if (taskCompleted) {
+              effectiveNote = `[跨月延续] ${s.note || ''}`;
+              effectiveUpdatedAt = task.completed_at;
+            } else {
+              effectiveNote = `[跨月延续] ${s.note || ''}`;
+            }
           }
         }
-      }
 
-      rows.push([
-        task.category?.name || '',
-        task.title,
-        task.description || '',
-        i + 1,
-        effectiveNote,
-        task.created_at || '',
-        task.started_at || '',
-        effectiveUpdatedAt,
-        task.completed_at || '',
-        `${effectiveProgress}%`,
-        task.status === 'completed' ? '已完成' :
-          task.status === 'in_progress' ? '进行中' : '已创建'
-      ]);
-    }
+        const filledCount = stages.filter(ss => ss.note && String(ss.note).trim() !== '').length;
+        const progress = stages.length > 0 ? Math.round((filledCount / stages.length) * 100) : 0;
+
+        rows.push([
+          task.category?.name || '',
+          task.title,
+          task.description || '',
+          i + 1,
+          effectiveNote,
+          task.created_at || '',
+          task.started_at || '',
+          effectiveUpdatedAt,
+          task.completed_at || '',
+          `${progress}%`,
+          task.status === 'completed' ? '已完成' :
+            task.status === 'in_progress' ? '进行中' : '已创建'
+        ]);
+      }
   }
 
   _findMonthIndex(ym, sortedMonths) {
@@ -227,6 +229,8 @@ class Exporter {
                   task.status === 'in_progress' ? '进行中' : '已创建'
               ]);
             } else {
+              const filledCount = stages.filter(ss => ss.note && String(ss.note).trim() !== '').length;
+              const progress = stages.length > 0 ? Math.round((filledCount / stages.length) * 100) : 0;
               for (let i = 0; i < stages.length; i++) {
                 const s = stages[i];
                 const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
@@ -234,7 +238,6 @@ class Exporter {
                 if (ym < stageCreatedYm) continue;
 
                 let effectiveNote = s.note || '';
-                let effectiveProgress = s.progress_value;
                 let effectiveUpdatedAt = s.updated_at || s.created_at;
 
                 const isStageCreatedThisMonth = (stageCreatedYm === ym);
@@ -262,7 +265,7 @@ class Exporter {
                   task.started_at || '',
                   effectiveUpdatedAt,
                   task.completed_at || '',
-                  `${effectiveProgress}%`,
+                  `${progress}%`,
                   task.status === 'completed' ? '已完成' :
                     task.status === 'in_progress' ? '进行中' : '已创建'
                 ]);
