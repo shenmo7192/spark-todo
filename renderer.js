@@ -475,14 +475,19 @@ $('btnAddTask').onclick = async () => {
   if (!title || !title.trim()) return;
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
-  await window.electronAPI.addTask({
-    categoryId: currentCategoryId,
-    title: title.trim(),
-    description: '',
-    status: isRoutine ? 'in_progress' : 'created',
-    isRoutine: isRoutine
-  });
-  await loadTasks(currentCategoryId);
+  try {
+    await window.electronAPI.addTask({
+      categoryId: currentCategoryId,
+      title: title.trim(),
+      description: '',
+      status: isRoutine ? 'in_progress' : 'created',
+      isRoutine: isRoutine
+    });
+    await loadTasks(currentCategoryId);
+  } catch (e) {
+    alert('创建任务失败: ' + (e.message || '未知错误'));
+    console.error('addTask error:', e);
+  }
 };
 
 function openCatModal() {

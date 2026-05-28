@@ -6,9 +6,9 @@ const ExcelDB = require('./db');
 const Exporter = require('./export');
 
 let mainWindow;
-const dbPath = path.join(app.getPath('userData'), 'data');
+const dbPath = path.join(__dirname, 'data');
 if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
-const dbFile = path.join(dbPath, 'todo.db');
+const dbFile = path.join(dbPath, 'todo.xlsx');
 
 const db = new ExcelDB(dbFile);
 const exporter = new Exporter(db);
@@ -41,27 +41,38 @@ app.on('window-all-closed', () => {
   if (process.platform !== 'darwin') app.quit();
 });
 
-// IPC handlers
-ipcMain.handle('db:getCategories', () => db.getCategories());
-ipcMain.handle('db:addCategory', (_, name, isRoutine) => db.addCategory(name, isRoutine));
-ipcMain.handle('db:deleteCategory', (_, id) => db.deleteCategory(id));
+// IPC handlers with error catching
+function safeHandler(fn) {
+  return async (...args) => {
+    try {
+      return await fn(...args);
+    } catch (e) {
+      console.error('IPC Error:', e);
+      throw e;
+    }
+  };
+}
 
-ipcMain.handle('db:getTasks', (_, categoryId, yearMonth) => db.getTasks(categoryId, yearMonth));
-ipcMain.handle('db:getTaskById', (_, taskId) => db.getTaskById(taskId));
-ipcMain.handle('db:addTask', (_, task) => db.addTask(task));
-ipcMain.handle('db:updateTask', (_, task) => db.updateTask(task));
-ipcMain.handle('db:deleteTask', (_, id) => db.deleteTask(id));
+ipcMain.handle('db:getCategories', safeHandler(() => db.getCategories()));
+ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine) => db.addCategory(name, isRoutine)));
+ipcMain.handle('db:deleteCategory', safeHandler((_, id) => db.deleteCategory(id)));
 
-ipcMain.handle('db:getStages', (_, taskId) => db.getStages(taskId));
-ipcMain.handle('db:addStage', (_, stage) => db.addStage(stage));
-ipcMain.handle('db:updateStage', (_, stage) => db.updateStage(stage));
+ipcMain.handle('db:getTasks', safeHandler((_, categoryId, yearMonth) => db.getTasks(categoryId, yearMonth)));
+ipcMain.handle('db:getTaskById', safeHandler((_, taskId) => db.getTaskById(taskId)));
+ipcMain.handle('db:addTask', safeHandler((_, task) => db.addTask(task)));
+ipcMain.handle('db:updateTask', safeHandler((_, task) => db.updateTask(task)));
+ipcMain.handle('db:deleteTask', safeHandler((_, id) => db.deleteTask(id)));
 
-ipcMain.handle('db:getRoutineRecord', (_, taskId, yearMonth) => db.getRoutineRecord(taskId, yearMonth));
-ipcMain.handle('db:fillRoutine', (_, record) => db.fillRoutine(record));
-ipcMain.handle('db:getLastMonthRoutine', (_, taskId, yearMonth) => db.getLastMonthRoutine(taskId, yearMonth));
-ipcMain.handle('db:checkRoutineUnfilled', (_, categoryId, yearMonth) => db.checkRoutineUnfilled(categoryId, yearMonth));
+ipcMain.handle('db:getStages', safeHandler((_, taskId) => db.getStages(taskId)));
+ipcMain.handle('db:addStage', safeHandler((_, stage) => db.addStage(stage)));
+ipcMain.handle('db:updateStage', safeHandler((_, stage) => db.updateStage(stage)));
 
-ipcMain.handle('db:getAllActiveMonths', () => db.getAllActiveMonths());
+ipcMain.handle('db:getRoutineRecord', safeHandler((_, taskId, yearMonth) => db.getRoutineRecord(taskId, yearMonth)));
+ipcMain.handle('db:fillRoutine', safeHandler((_, record) => db.fillRoutine(record)));
+ipcMain.handle('db:getLastMonthRoutine', safeHandler((_, taskId, yearMonth) => db.getLastMonthRoutine(taskId, yearMonth)));
+ipcMain.handle('db:checkRoutineUnfilled', safeHandler((_, categoryId, yearMonth) => db.checkRoutineUnfilled(categoryId, yearMonth)));
+
+ipcMain.handle('db:getAllActiveMonths', safeHandler(() => db.getAllActiveMonths()));
 
 ipcMain.handle('export:excel', async (_, targetPath) => {
   try {
