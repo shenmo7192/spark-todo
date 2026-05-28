@@ -23,7 +23,7 @@
   },
   "build": {
     "appId": "com.spark.todo",
-    "productName": "SparkTodo",
+    "productName": "Spark Todo 星火工单系统",
     "directories": {
       "output": "dist"
     },
@@ -35,6 +35,7 @@
       "index.html",
       "styles.css",
       "renderer.js",
+      "assets/**/*",
       "node_modules/**/*"
     ],
     "extraResources": [
@@ -42,14 +43,19 @@
     ],
     "linux": {
       "target": ["deb"],
-      "category": "Utility"
+      "category": "Utility",
+      "icon": "assets/icon.png"
     },
     "win": {
-      "target": ["nsis"]
+      "target": ["nsis"],
+      "icon": "assets/icon.png"
     },
     "nsis": {
       "oneClick": false,
-      "allowToChangeInstallationDirectory": true
+      "allowToChangeInstallationDirectory": true,
+      "installerIcon": "assets/icon.png",
+      "uninstallerIcon": "assets/icon.png",
+      "installerHeaderIcon": "assets/icon.png"
     }
   }
 }
