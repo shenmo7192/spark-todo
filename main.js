@@ -6,12 +6,17 @@ const ExcelDB = require('./db');
 const Exporter = require('./export');
 
 let mainWindow;
-const dbPath = path.join(__dirname, 'data');
-if (!fs.existsSync(dbPath)) fs.mkdirSync(dbPath, { recursive: true });
-const dbFile = path.join(dbPath, 'todo.xlsx');
+let db;
+let exporter;
+const isPackaged = app.isPackaged;
 
-const db = new ExcelDB(dbFile);
-const exporter = new Exporter(db);
+function initDataDir() {
+  const dataDir = isPackaged
+    ? path.join(app.getPath('userData'), 'data')
+    : path.join(__dirname, 'data');
+  if (!fs.existsSync(dataDir)) fs.mkdirSync(dataDir, { recursive: true });
+  return path.join(dataDir, 'todo.xlsx');
+}
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -27,10 +32,12 @@ function createWindow() {
   });
 
   mainWindow.loadFile(path.join(__dirname, 'index.html'));
-  // mainWindow.webContents.openDevTools();
 }
 
 app.whenReady().then(() => {
+  const dbFile = initDataDir();
+  db = new ExcelDB(dbFile);
+  exporter = new Exporter(db);
   createWindow();
   app.on('activate', () => {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
