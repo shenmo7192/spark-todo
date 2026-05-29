@@ -44,7 +44,7 @@
     "linux": {
       "target": ["deb"],
       "category": "Utility",
-      "icon": "build/icon.png"
+      "icon": "build/icons"
     },
     "win": {
       "target": ["nsis"],
