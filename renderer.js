@@ -58,11 +58,13 @@ async function loadAllMonths() {
 function populateYearMonthSelects() {
   const yearSel = $('yearSelect');
   yearSel.innerHTML = '';
-  const currentYear = new Date().getFullYear();
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const currentMonth = String(now.getMonth() + 1).padStart(2, '0');
   for (let y = currentYear - 20; y <= currentYear + 1; y++) {
     const opt = document.createElement('option');
     opt.value = y;
-    opt.textContent = y + '年';
+    opt.textContent = y + '年' + (y === currentYear ? ' (当前)' : '');
     yearSel.appendChild(opt);
   }
 
@@ -72,7 +74,7 @@ function populateYearMonthSelects() {
     const val = String(m).padStart(2, '0');
     const opt = document.createElement('option');
     opt.value = val;
-    opt.textContent = val + '月';
+    opt.textContent = val + '月' + (val === currentMonth ? ' (当前)' : '');
     monthSel.appendChild(opt);
   }
 }
@@ -281,11 +283,12 @@ function renderTasks() {
     let progressHtml = '';
 
     if (isRoutine) {
-      statusClass = 'status-routine';
-      statusText = '日常工作';
+      const isEnded = task.status === 'completed';
+      statusClass = isEnded ? 'status-completed' : 'status-routine';
+      statusText = isEnded ? '已结束' : '日常工作';
       const rec = task.routineRecord;
-      const qty = rec ? rec.quantity : '未填报';
-      const qtyColor = rec ? '' : 'color:var(--danger);';
+      const qty = rec ? rec.quantity : (isEnded ? '—' : '未填报');
+      const qtyColor = rec ? '' : (isEnded ? '' : 'color:var(--danger);');
       const descHtml = task.description
         ? `<div class="task-latest-note">📝 ${escapeHtml(task.description)}</div>`
         : '';
@@ -515,22 +518,39 @@ async function openTaskModal(taskId) {
   updateStatusButtons(openedTask.status);
 
   if (isRoutine) {
+    const isEnded = openedTask.status === 'completed';
     const rec = openedTask.routineRecord;
     $('routineQty').value = rec ? rec.quantity : '';
     $('routineLabelMonth').textContent = currentYearMonth;
 
-    const lastYm = getLastYearMonth(currentYearMonth);
-    const lastRec = await window.electronAPI.getLastMonthRoutine(openedTask.id, currentYearMonth);
-    $('routineInfo').innerHTML = lastRec
-      ? `上月(${lastYm})填报: <strong>${lastRec.quantity}</strong> (已填报 ✓)`
-      : `上月(${lastYm}): <span style="color:var(--danger);">未填报 ⚠️</span>`;
-
-    if (!lastRec) {
-      $('backfillPanel').style.display = 'block';
-      $('backfillLabelMonth').textContent = lastYm;
-      $('backfillQty').value = '';
-    } else {
+    if (isEnded) {
+      $('routineQty').disabled = true;
+      $('btnSaveRoutine').style.display = 'none';
       $('backfillPanel').style.display = 'none';
+      $('routineInfo').innerHTML = `<span style="color:var(--success);">该日常工作已于 ${formatDateTime(openedTask.completed_at)} 结束</span>`;
+      $('btnEndRoutine').style.display = 'none';
+      $('btnReopenRoutine').style.display = '';
+      $('endRoutineInfo').style.display = 'inline';
+      $('endRoutineInfo').textContent = '已结束';
+    } else {
+      $('routineQty').disabled = false;
+      $('btnSaveRoutine').style.display = '';
+      $('btnEndRoutine').style.display = '';
+      $('btnReopenRoutine').style.display = 'none';
+      const lastYm = getLastYearMonth(currentYearMonth);
+      const lastRec = await window.electronAPI.getLastMonthRoutine(openedTask.id, currentYearMonth);
+      $('routineInfo').innerHTML = lastRec
+        ? `上月(${lastYm})填报: <strong>${lastRec.quantity}</strong> (已填报 ✓)`
+        : `上月(${lastYm}): <span style="color:var(--danger);">未填报 ⚠️</span>`;
+
+      if (!lastRec) {
+        $('backfillPanel').style.display = 'block';
+        $('backfillLabelMonth').textContent = lastYm;
+        $('backfillQty').value = '';
+      } else {
+        $('backfillPanel').style.display = 'none';
+      }
+      $('endRoutineInfo').style.display = 'none';
     }
   } else {
     renderStages(openedTask);
@@ -814,6 +834,51 @@ $('btnBackfillRoutine').onclick = async () => {
   await loadTasks(currentCategoryId);
 };
 
+$('btnEndRoutine').onclick = async () => {
+  if (!openedTask) return;
+  if (!confirm('确定结束该日常工作？结束后，下月起将不再出现在列表中。')) return;
+  await window.electronAPI.updateTask({
+    id: openedTask.id,
+    title: openedTask.title,
+    description: openedTask.description || '',
+    status: 'completed',
+    progress: 100
+  });
+  await refreshOpenedTask();
+  $('routineQty').disabled = true;
+  $('btnSaveRoutine').style.display = 'none';
+  $('backfillPanel').style.display = 'none';
+  $('btnEndRoutine').style.display = 'none';
+  $('btnReopenRoutine').style.display = '';
+  $('endRoutineInfo').style.display = 'inline';
+  $('endRoutineInfo').textContent = '已结束';
+  $('routineInfo').innerHTML = `<span style="color:var(--success);">该日常工作已结束</span>`;
+  $('timeCompleted').textContent = formatDateTime(new Date().toISOString());
+  await loadTasks(currentCategoryId);
+};
+
+$('btnReopenRoutine').onclick = async () => {
+  if (!openedTask) return;
+  if (!confirm('确定重新开启该日常工作？')) return;
+  await window.electronAPI.updateTask({
+    id: openedTask.id,
+    title: openedTask.title,
+    description: openedTask.description || '',
+    status: 'in_progress',
+    progress: 0
+  });
+  await refreshOpenedTask();
+  $('routineQty').disabled = false;
+  $('routineQty').value = '';
+  $('btnSaveRoutine').style.display = '';
+  $('btnEndRoutine').style.display = '';
+  $('btnReopenRoutine').style.display = 'none';
+  $('endRoutineInfo').style.display = 'none';
+  $('routineInfo').innerHTML = '';
+  $('timeCompleted').textContent = '-';
+  await loadTasks(currentCategoryId);
+};
+
 async function saveAndCloseTaskModal() {
   if (!openedTask) { await closeTaskModal(); return; }
   const title = $('taskTitle').value.trim();
@@ -860,6 +925,12 @@ function openNewTaskModal() {
   $('newTaskTitle').value = '';
   $('newTaskDesc').value = '';
   $('newTaskStageNote').value = '';
+  const nowYm = getNowYearMonth();
+  if (currentYearMonth === nowYm) {
+    $('newTaskDate').value = new Date().toISOString().substring(0, 10);
+  } else {
+    $('newTaskDate').value = currentYearMonth + '-01';
+  }
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
   $('newTaskStagePanel').style.display = isRoutine ? 'none' : 'block';
@@ -878,13 +949,16 @@ $('btnConfirmNewTask').onclick = async () => {
   const isRoutine = cat ? cat.is_routine : false;
   const desc = $('newTaskDesc').value.trim();
   const stageNote = $('newTaskStageNote').value.trim();
+  const dateVal = $('newTaskDate').value;
+  const createdAt = dateVal ? new Date(dateVal + 'T00:00:00').toISOString() : undefined;
   try {
     const newTaskId = await window.electronAPI.addTask({
       categoryId: currentCategoryId,
       title: title.trim(),
       description: desc,
       status: isRoutine ? 'in_progress' : 'created',
-      isRoutine: isRoutine
+      isRoutine: isRoutine,
+      createdAt: createdAt
     });
     if (!isRoutine && stageNote) {
       await window.electronAPI.addStage({
@@ -1014,5 +1088,90 @@ $('btnBulkCancel').onclick = () => {
 $('modalOverlay').onclick = (e) => { if (e.target === $('modalOverlay')) saveAndCloseTaskModal(); };
 $('catModalOverlay').onclick = (e) => { if (e.target === $('catModalOverlay')) closeCatModal(); };
 $('btnCloseModal').onclick = closeTaskModal;
+
+// Overview modal
+$('btnOverview').onclick = openOverviewModal;
+$('btnCloseOverviewModal').onclick = closeOverviewModal;
+$('overviewModalOverlay').onclick = (e) => { if (e.target === $('overviewModalOverlay')) closeOverviewModal(); };
+
+function openOverviewModal() {
+  $('overviewModalOverlay').classList.add('show');
+  populateOverviewYearSelect();
+  loadOverviewData();
+}
+
+function closeOverviewModal() {
+  $('overviewModalOverlay').classList.remove('show');
+}
+
+function populateOverviewYearSelect() {
+  const sel = $('overviewYearSelect');
+  sel.innerHTML = '';
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear - 5; y <= currentYear + 1; y++) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y + '年' + (y === currentYear ? ' (当前)' : '');
+    sel.appendChild(opt);
+  }
+  sel.value = currentYear;
+  sel.onchange = () => loadOverviewData();
+}
+
+async function loadOverviewData() {
+  const year = parseInt($('overviewYearSelect').value);
+  const data = await window.electronAPI.getAllTasksByYear(year);
+  const grid = $('overviewGrid');
+  grid.innerHTML = '';
+
+  const months = [
+    '1月', '2月', '3月', '4月', '5月', '6月',
+    '7月', '8月', '9月', '10月', '11月', '12月'
+  ];
+
+  for (let m = 1; m <= 12; m++) {
+    const ym = `${year}-${String(m).padStart(2, '0')}`;
+    const tasksForMonth = data[ym] || [];
+    const card = document.createElement('div');
+    card.className = 'overview-month-card';
+
+    if (tasksForMonth.length === 0) {
+      card.innerHTML = `<h3>${months[m - 1]}</h3><div class="overview-month-empty">无任务</div>`;
+    } else {
+      let itemsHtml = '';
+      for (const t of tasksForMonth) {
+        let dotClass = t.is_routine ? 'routine' : t.status;
+        itemsHtml += `
+          <div class="overview-task-item" data-task-id="${t.id}" data-category-id="${t.categoryId}"
+               data-year-month="${ym}" title="${escapeHtml(t.title)}">
+            <span class="overview-task-dot ${dotClass}"></span>
+            <span class="overview-task-title">${escapeHtml(t.title)}</span>
+          </div>`;
+      }
+      card.innerHTML = `<h3>${months[m - 1]} (${tasksForMonth.length})</h3>${itemsHtml}`;
+    }
+
+    card.querySelectorAll('.overview-task-item').forEach(item => {
+      item.addEventListener('click', () => {
+        const taskId = parseInt(item.dataset.taskId);
+        const categoryId = parseInt(item.dataset.categoryId);
+        const ym = item.dataset.yearMonth;
+        closeOverviewModal();
+        if (currentCategoryId !== categoryId) {
+          currentCategoryId = categoryId;
+          renderTabs();
+        }
+        currentYearMonth = ym;
+        $('yearSelect').value = ym.substring(0, 4);
+        $('monthSelect').value = ym.substring(5);
+        loadTasks(currentCategoryId).then(() => {
+          openTaskModal(taskId);
+        });
+      });
+    });
+
+    grid.appendChild(card);
+  }
+}
 
 init();

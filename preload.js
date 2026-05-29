@@ -29,6 +29,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   getAllActiveMonths: () => ipcRenderer.invoke('db:getAllActiveMonths'),
   carryOverTasks: (targetYearMonth, categoryId) => ipcRenderer.invoke('db:carryOverTasks', targetYearMonth, categoryId),
+  getAllTasksByYear: (year) => ipcRenderer.invoke('db:getAllTasksByYear', year),
 
   // Export
   exportExcel: (targetPath) => ipcRenderer.invoke('export:excel', targetPath),

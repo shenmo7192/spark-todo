@@ -84,6 +84,7 @@ ipcMain.handle('db:checkRoutineUnfilled', safeHandler((_, categoryId, yearMonth)
 
 ipcMain.handle('db:getAllActiveMonths', safeHandler(() => db.getAllActiveMonths()));
 ipcMain.handle('db:carryOverTasks', safeHandler((_, targetYearMonth, categoryId) => db.carryOverTasks(targetYearMonth, categoryId)));
+ipcMain.handle('db:getAllTasksByYear', safeHandler((_, year) => db.getAllTasksByYear(year)));
 
 ipcMain.handle('export:excel', async (_, targetPath) => {
   try {

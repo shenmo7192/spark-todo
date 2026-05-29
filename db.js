@@ -201,6 +201,12 @@ class ExcelDB {
 
     for (const task of tasks) {
       if (task.is_routine) {
+        if (yearMonth) {
+          const createdYm = task.created_at ? task.created_at.substring(0, 7) : '';
+          if (createdYm && createdYm > yearMonth) continue;
+          const completedYm = task.completed_at ? task.completed_at.substring(0, 7) : '';
+          if (completedYm && completedYm < yearMonth) continue;
+        }
         const recs = this._sheetToJson(SHEETS.routine_records)
           .filter(r => r[1] == task.id && r[2] === yearMonth)
           .map(r => ({ id: r[0], task_id: r[1], year_month: r[2], quantity: r[3], filled_at: r[4] }));
@@ -211,6 +217,13 @@ class ExcelDB {
           .filter(r => r[1] == task.id)
           .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6] }))
           .sort((a, b) => a.stage_index - b.stage_index);
+
+        if (yearMonth) {
+          const createdYm = task.created_at ? task.created_at.substring(0, 7) : '';
+          if (createdYm && createdYm > yearMonth) continue;
+          const completedYm = task.completed_at ? task.completed_at.substring(0, 7) : '';
+          if (completedYm && completedYm < yearMonth) continue;
+        }
 
         const taskMonths = new Set();
         if (task.created_at) taskMonths.add(task.created_at.substring(0, 7));
@@ -233,9 +246,10 @@ class ExcelDB {
   addTask(task) {
     const id = this._nextId('task');
     const now = new Date().toISOString();
+    const createdAt = task.createdAt || now;
     this._appendRows(SHEETS.tasks, [[
       id, task.categoryId, task.title, task.description || '', task.status || 'created',
-      task.progress || 0, task.isRoutine ? 1 : 0, now, '', ''
+      task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', ''
     ]]);
     this.save();
     return id;
@@ -454,6 +468,7 @@ class ExcelDB {
 
     const unfilled = [];
     for (const task of routineTasks) {
+      if (task.completed_at) continue;
       const lastRec = this.getRoutineRecord(task.id, lastYm);
       const curRec = this.getRoutineRecord(task.id, yearMonth);
       if (!lastRec) {
@@ -476,17 +491,32 @@ class ExcelDB {
     const nonRoutineTasks = allTasks.filter(t =>
       t.category_id == categoryId && !t.is_routine && t.status !== 'completed'
     );
-    const existingCarries = this._sheetToJson(SHEETS.carry_overs)
+
+    const completedTaskIds = allTasks
+      .filter(t => t.category_id == categoryId && !t.is_routine && t.status === 'completed')
+      .map(t => t.id);
+
+    let carries = this._sheetToJson(SHEETS.carry_overs);
+    if (completedTaskIds.length > 0) {
+      carries = carries.filter(r => !completedTaskIds.includes(r[0]));
+    }
+
+    const existingCarries = carries
       .filter(r => r[1] === targetYearMonth)
       .map(r => r[0]);
     const newCarries = [];
     for (const task of nonRoutineTasks) {
+      const createdYm = task.created_at ? task.created_at.substring(0, 7) : '';
+      if (createdYm && createdYm > targetYearMonth) continue;
       if (!existingCarries.includes(task.id)) {
         newCarries.push([task.id, targetYearMonth, new Date().toISOString()]);
       }
     }
     if (newCarries.length > 0) {
-      this._appendRows(SHEETS.carry_overs, newCarries);
+      carries = [...carries, ...newCarries];
+    }
+    this._replaceSheet(SHEETS.carry_overs, carries);
+    if (newCarries.length > 0 || completedTaskIds.length > 0) {
       this.save();
     }
     return newCarries.length;
@@ -503,6 +533,69 @@ class ExcelDB {
       map[r[0]] = r[2];
     }
     return map;
+  }
+
+  getAllTasksByYear(year) {
+    const cats = this.getCategories();
+    const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
+      id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+    }));
+
+    const result = {};
+    for (let m = 1; m <= 12; m++) {
+      const ym = `${year}-${String(m).padStart(2, '0')}`;
+      result[ym] = [];
+    }
+
+    for (const task of allTasks) {
+      const createdYm = task.created_at ? task.created_at.substring(0, 7) : '';
+      const completedYm = task.completed_at ? task.completed_at.substring(0, 7) : '';
+      const taskCategory = cats.find(c => c.id == task.category_id);
+
+      for (let m = 1; m <= 12; m++) {
+        const ym = `${year}-${String(m).padStart(2, '0')}`;
+
+        if (createdYm && createdYm > ym) continue;
+        if (completedYm && completedYm < ym) continue;
+
+        let visible = false;
+        if (task.is_routine) {
+          visible = true;
+        } else {
+          if (createdYm === ym) { visible = true; }
+          else if (completedYm === ym) { visible = true; }
+          else {
+            const stages = this._sheetToJson(SHEETS.stages)
+              .filter(r => r[1] == task.id);
+            for (const s of stages) {
+              if (s[5] && s[5].substring(0, 7) === ym) { visible = true; break; }
+              if (s[6] && s[6].substring(0, 7) === ym) { visible = true; break; }
+            }
+            if (!visible) {
+              const carried = this._sheetToJson(SHEETS.carry_overs)
+                .filter(r => r[0] == task.id && r[1] === ym);
+              if (carried.length > 0) visible = true;
+            }
+          }
+        }
+
+        if (visible) {
+          result[ym].push({
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            progress: task.progress,
+            is_routine: task.is_routine,
+            categoryName: taskCategory ? taskCategory.name : '',
+            categoryId: task.category_id,
+            created_at: task.created_at
+          });
+        }
+      }
+    }
+
+    return result;
   }
 }
 

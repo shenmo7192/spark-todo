@@ -14,6 +14,7 @@
         <select class="month-select" id="yearSelect"></select>
         <select class="month-select" id="monthSelect"></select>
         <button class="btn btn-export" id="btnExport">📥 导出Excel台账</button>
+        <button class="btn btn-export" id="btnOverview">📊 任务总览</button>
       </div>
     </header>
 
@@ -70,6 +71,11 @@
               <input type="number" id="backfillQty" class="input input-short" placeholder="数量">
               <button class="btn btn-danger" id="btnBackfillRoutine">补填上月</button>
             </div>
+          </div>
+          <div id="endRoutinePanel" style="margin-top:12px;padding-top:12px;border-top:1px dashed var(--border);">
+            <button class="btn btn-sm" id="btnEndRoutine" style="background:#fee2e2;color:#991b1b;border:1px solid #fecaca;">⏹ 结束该日常工作</button>
+            <button class="btn btn-sm" id="btnReopenRoutine" style="background:#d1fae5;color:#065f46;border:1px solid #a7f3d0;display:none;">🔄 重新开启</button>
+            <span id="endRoutineInfo" style="font-size:12px;color:var(--text-secondary);margin-left:8px;display:none;"></span>
           </div>
         </div>
 
@@ -161,6 +167,10 @@
           <input type="text" id="newTaskTitle" class="input" placeholder="请输入任务名称">
         </div>
         <div class="form-row">
+          <label>创建日期</label>
+          <input type="date" id="newTaskDate" class="input" style="width:180px;">
+        </div>
+        <div class="form-row">
           <label>文本描述 / 工作思路 / STAR总结</label>
           <textarea id="newTaskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
         </div>
@@ -203,6 +213,23 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btnConfirmExport">导出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Task Overview -->
+  <div class="modal-overlay" id="overviewModalOverlay">
+    <div class="modal modal-wide">
+      <div class="modal-header">
+        <h2>📊 任务总览</h2>
+        <button class="btn-close" id="btnCloseOverviewModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="overview-year-row">
+          <label>选择年份：</label>
+          <select id="overviewYearSelect" class="input" style="width:120px;"></select>
+        </div>
+        <div class="overview-grid" id="overviewGrid"></div>
       </div>
     </div>
   </div>
