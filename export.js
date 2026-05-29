@@ -7,6 +7,73 @@ class Exporter {
     this.db = db;
   }
 
+  _fmtDate(d) {
+    if (!d) return '';
+    const date = new Date(d.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) {
+      const m = d.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : d.substring(0, 10);
+    }
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${y}-${mo}-${day}`;
+  }
+
+  _fmtDateTime(d) {
+    if (!d) return '';
+    const date = new Date(d.replace(/-/g, '/'));
+    if (isNaN(date.getTime())) {
+      const m = d.match(/^(\d{4}-\d{2}-\d{2})/);
+      return m ? m[1] : d.substring(0, 16);
+    }
+    const y = date.getFullYear();
+    const mo = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    const h = String(date.getHours()).padStart(2, '0');
+    const mi = String(date.getMinutes()).padStart(2, '0');
+    return `${y}-${mo}-${day} ${h}:${mi}`;
+  }
+
+  _stageProgress(stageIndex, totalStages) {
+    if (totalStages <= 0) return 0;
+    return Math.round((stageIndex / totalStages) * 100);
+  }
+
+  _statusLabel(status) {
+    const map = { created: '已创建', in_progress: '进行中', completed: '已完成' };
+    return map[status] || status;
+  }
+
+  _headerRow() {
+    return [
+      '分类', '任务名称', '文本描述', '第几段', '阶段备注（更新内容）',
+      '接收时间', '开始时间', '更新时间', '结束时间',
+      '完成度', '状态'
+    ];
+  }
+
+  _columnWidths() {
+    return [
+      { wch: 10 },  // 分类
+      { wch: 20 },  // 任务名称
+      { wch: 30 },  // 文本描述
+      { wch: 12 },  // 第几段
+      { wch: 35 },  // 阶段备注
+      { wch: 18 },  // 接收时间
+      { wch: 18 },  // 开始时间
+      { wch: 18 },  // 更新时间
+      { wch: 18 },  // 结束时间
+      { wch: 10 },  // 完成度
+      { wch: 10 },  // 状态
+    ];
+  }
+
+  _styleSheet(ws) {
+    ws['!cols'] = this._columnWidths();
+    return ws;
+  }
+
   async exportToExcel(targetPath) {
     const tasks = this.db.getExportData();
     const wb = xlsx.utils.book_new();
@@ -20,12 +87,7 @@ class Exporter {
     }
 
     for (const ym of sortedMonths) {
-      const rows = [];
-      rows.push([
-        '分类', '任务名称', '文本描述', '段号', '阶段备注(更新内容)',
-        '任务接收时间(创建时间)', '开始时间', '阶段更新时间', '结束时间',
-        '完成度%', '状态'
-      ]);
+      const rows = [this._headerRow()];
 
       for (const task of tasks) {
         if (task.is_routine) {
@@ -36,7 +98,7 @@ class Exporter {
       }
 
       if (rows.length > 1) {
-        const ws = xlsx.utils.aoa_to_sheet(rows);
+        const ws = this._styleSheet(xlsx.utils.aoa_to_sheet(rows));
         xlsx.utils.book_append_sheet(wb, ws, ym);
       }
     }
@@ -76,9 +138,9 @@ class Exporter {
         task.description || '',
         '-',
         `填报数量: ${rec.quantity}`,
-        task.created_at || '',
+        this._fmtDate(task.created_at),
         '-',
-        rec.filled_at || '',
+        this._fmtDateTime(rec.filled_at),
         '-',
         '-',
         '日常工作'
@@ -88,7 +150,7 @@ class Exporter {
 
   _exportStagesForMonth(task, ym, rows, allYearMonths) {
     const stages = task.stages || [];
-    const now = new Date().toISOString();
+    const totalStages = stages.length;
     const taskCompleted = task.status === 'completed' ? (task.completed_at || null) : null;
     const taskEndYm = taskCompleted ? taskCompleted.substring(0, 7) : null;
 
@@ -101,75 +163,62 @@ class Exporter {
           task.description || '',
           '-',
           '',
-          task.created_at || '',
-          task.started_at || '',
+          this._fmtDate(task.created_at),
+          this._fmtDate(task.started_at),
           '',
-          task.completed_at || '',
+          this._fmtDate(task.completed_at),
           '0%',
-          task.status === 'completed' ? '已完成' :
-            task.status === 'in_progress' ? '进行中' : '已创建'
+          this._statusLabel(task.status)
         ]);
       }
       return;
     }
 
     for (let i = 0; i < stages.length; i++) {
-        const s = stages[i];
-        const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
-        const stageUpdatedYm = s.updated_at ? s.updated_at.substring(0, 7) : stageCreatedYm;
-        const stageIndex = this._findMonthIndex(ym, allYearMonths);
+      const s = stages[i];
+      const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
+      const stageUpdatedYm = s.updated_at ? s.updated_at.substring(0, 7) : stageCreatedYm;
 
-        if (!stageCreatedYm) continue;
-        if (ym < stageCreatedYm) continue;
+      if (!stageCreatedYm) continue;
+      if (ym < stageCreatedYm) continue;
+      if (taskEndYm && ym > taskEndYm) continue;
 
-        if (taskEndYm && ym > taskEndYm) continue;
+      let effectiveNote = s.note || '';
+      let effectiveUpdatedAt = s.updated_at || s.created_at;
 
-        let effectiveNote = s.note || '';
-        let effectiveUpdatedAt = s.updated_at || s.created_at;
+      const isStageCreatedThisMonth = (stageCreatedYm === ym);
+      const isStageUpdatedThisMonth = (stageUpdatedYm === ym) && (stageCreatedYm !== ym);
 
-        const isStageCreatedThisMonth = (stageCreatedYm === ym);
-        const isStageUpdatedThisMonth = (stageUpdatedYm === ym) && (stageCreatedYm !== ym);
+      if (!isStageCreatedThisMonth && !isStageUpdatedThisMonth) {
+        const hasNewerStage = stages.some((ns, nj) =>
+          nj > i && ns.created_at && ns.created_at.substring(0, 7) <= ym
+        );
+        if (hasNewerStage) continue;
 
-        if (!isStageCreatedThisMonth && !isStageUpdatedThisMonth) {
-          const hasNewerStage = stages.some((ns, nj) =>
-            nj > i && ns.created_at && ns.created_at.substring(0, 7) <= ym
-          );
-          if (hasNewerStage) {
-            continue;
-          }
-
-          if (ym > stageCreatedYm) {
-            const nextStage = stages.find((ns, nj) =>
-              nj > i && ns.created_at && ns.created_at.substring(0, 7) > stageCreatedYm
-            );
-
-            if (taskCompleted) {
-              effectiveNote = `[跨月延续] ${s.note || ''}`;
-              effectiveUpdatedAt = task.completed_at;
-            } else {
-              effectiveNote = `[跨月延续] ${s.note || ''}`;
-            }
+        if (ym > stageCreatedYm) {
+          effectiveNote = `[跨月延续] ${s.note || ''}`;
+          if (taskCompleted) {
+            effectiveUpdatedAt = task.completed_at;
           }
         }
-
-        const filledCount = stages.filter(ss => ss.note && String(ss.note).trim() !== '').length;
-        const progress = stages.length > 0 ? Math.round((filledCount / stages.length) * 100) : 0;
-
-        rows.push([
-          task.category?.name || '',
-          task.title,
-          task.description || '',
-          i + 1,
-          effectiveNote,
-          task.created_at || '',
-          task.started_at || '',
-          effectiveUpdatedAt,
-          task.completed_at || '',
-          `${progress}%`,
-          task.status === 'completed' ? '已完成' :
-            task.status === 'in_progress' ? '进行中' : '已创建'
-        ]);
       }
+
+      const progress = this._stageProgress(i + 1, totalStages);
+
+      rows.push([
+        task.category?.name || '',
+        task.title,
+        task.description || '',
+        `${i + 1}/${totalStages}`,
+        effectiveNote,
+        this._fmtDate(task.created_at),
+        this._fmtDate(task.started_at),
+        this._fmtDateTime(effectiveUpdatedAt),
+        this._fmtDate(task.completed_at),
+        `${progress}%`,
+        this._statusLabel(task.status)
+      ]);
+    }
   }
 
   _findMonthIndex(ym, sortedMonths) {
@@ -186,12 +235,7 @@ class Exporter {
       let hasData = false;
 
       for (const cat of cats) {
-        const rows = [];
-        rows.push([
-          '分类', '任务名称', '文本描述', '段号', '阶段备注(更新内容)',
-          '任务接收时间(创建时间)', '开始时间', '阶段更新时间', '结束时间',
-          '完成度%', '状态'
-        ]);
+        const rows = [this._headerRow()];
 
         const tasks = this.db.getTasks(cat.id, ym);
         for (const task of tasks) {
@@ -203,9 +247,9 @@ class Exporter {
                 task.description || '',
                 '-',
                 `填报数量: ${task.routineRecord.quantity}`,
-                task.created_at || '',
+                this._fmtDate(task.created_at),
                 '-',
-                task.routineRecord.filled_at || '',
+                this._fmtDateTime(task.routineRecord.filled_at),
                 '-',
                 '-',
                 '日常工作'
@@ -213,6 +257,8 @@ class Exporter {
             }
           } else {
             const stages = task.stages || [];
+            const totalStages = stages.length;
+
             if (stages.length === 0) {
               rows.push([
                 cat.name,
@@ -220,17 +266,14 @@ class Exporter {
                 task.description || '',
                 '-',
                 '',
-                task.created_at || '',
-                task.started_at || '',
+                this._fmtDate(task.created_at),
+                this._fmtDate(task.started_at),
                 '',
-                task.completed_at || '',
+                this._fmtDate(task.completed_at),
                 '0%',
-                task.status === 'completed' ? '已完成' :
-                  task.status === 'in_progress' ? '进行中' : '已创建'
+                this._statusLabel(task.status)
               ]);
             } else {
-              const filledCount = stages.filter(ss => ss.note && String(ss.note).trim() !== '').length;
-              const progress = stages.length > 0 ? Math.round((filledCount / stages.length) * 100) : 0;
               for (let i = 0; i < stages.length; i++) {
                 const s = stages[i];
                 const stageCreatedYm = s.created_at ? s.created_at.substring(0, 7) : null;
@@ -255,19 +298,20 @@ class Exporter {
                   }
                 }
 
+                const progress = this._stageProgress(i + 1, totalStages);
+
                 rows.push([
                   cat.name,
                   task.title,
                   task.description || '',
-                  i + 1,
+                  `${i + 1}/${totalStages}`,
                   effectiveNote,
-                  task.created_at || '',
-                  task.started_at || '',
-                  effectiveUpdatedAt,
-                  task.completed_at || '',
+                  this._fmtDate(task.created_at),
+                  this._fmtDate(task.started_at),
+                  this._fmtDateTime(effectiveUpdatedAt),
+                  this._fmtDate(task.completed_at),
                   `${progress}%`,
-                  task.status === 'completed' ? '已完成' :
-                    task.status === 'in_progress' ? '进行中' : '已创建'
+                  this._statusLabel(task.status)
                 ]);
               }
             }
@@ -275,7 +319,7 @@ class Exporter {
         }
 
         if (rows.length > 1) {
-          const ws = xlsx.utils.aoa_to_sheet(rows);
+          const ws = this._styleSheet(xlsx.utils.aoa_to_sheet(rows));
           xlsx.utils.book_append_sheet(wb, ws, cat.name);
           hasData = true;
         }

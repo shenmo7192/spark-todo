@@ -247,6 +247,9 @@ async function loadTasks(categoryId) {
     const aDone = a.status === 'completed' ? 1 : 0;
     const bDone = b.status === 'completed' ? 1 : 0;
     if (aDone !== bDone) return aDone - bDone;
+    const aOrder = parseInt(a.sort_order) || 0;
+    const bOrder = parseInt(b.sort_order) || 0;
+    if (aOrder !== bOrder) return aOrder - bOrder;
     return new Date(b.created_at) - new Date(a.created_at);
   });
   renderTasks();
@@ -270,6 +273,13 @@ function renderTasks() {
   for (const task of tasks) {
     const card = document.createElement('div');
     card.className = 'task-card' + (task.status === 'completed' ? ' completed' : '');
+    card.dataset.taskId = task.id;
+    card.draggable = true;
+    card.addEventListener('dragstart', onDragStart);
+    card.addEventListener('dragend', onDragEnd);
+    card.addEventListener('dragover', onDragOver);
+    card.addEventListener('dragleave', onDragLeave);
+    card.addEventListener('drop', onDrop);
     card.onclick = () => {
       if (selectedTaskIds.size > 0) {
         toggleSelectTask(task.id);
@@ -297,10 +307,10 @@ function renderTasks() {
       const pct = task.progress || 0;
       const stages = task.stages || [];
       const stageCount = stages.length;
-      const filledCount = stages.filter(s => s.note && s.note.trim() !== '').length;
+      const filledCount = stages.filter(s => s.is_completed == 1).length;
       let latestNoteHtml = '';
       if (stages.length > 0) {
-        const newestFilledStage = [...stages].reverse().find(s => s.note && s.note.trim() !== '');
+        const newestFilledStage = [...stages].reverse().find(s => s.is_completed == 1);
         if (newestFilledStage) {
           latestNoteHtml = `<div class="task-latest-note">📝 第${newestFilledStage.stage_index}段: ${escapeHtml(newestFilledStage.note)}</div>`;
         } else if (task.description) {
@@ -379,6 +389,78 @@ function updateBulkBar() {
   } else {
     bar.style.display = 'none';
   }
+}
+
+let dragSrcId = null;
+
+function onDragStart(e) {
+  const card = e.target.closest('.task-card');
+  if (!card) return;
+  dragSrcId = parseInt(card.dataset.taskId);
+  card.classList.add('dragging');
+  e.dataTransfer.effectAllowed = 'move';
+  e.dataTransfer.setData('text/plain', dragSrcId);
+}
+
+function onDragEnd(e) {
+  const card = e.target.closest('.task-card');
+  if (card) card.classList.remove('dragging');
+  dragSrcId = null;
+  document.querySelectorAll('.task-card.drag-over').forEach(c => c.classList.remove('drag-over'));
+}
+
+function onDragOver(e) {
+  e.preventDefault();
+  e.dataTransfer.dropEffect = 'move';
+  const card = e.target.closest('.task-card');
+  if (!card || !dragSrcId) return;
+  const targetId = parseInt(card.dataset.taskId);
+  if (targetId === dragSrcId) return;
+  const srcTask = tasks.find(t => t.id === dragSrcId);
+  const tgtTask = tasks.find(t => t.id === targetId);
+  if (!srcTask || !tgtTask) return;
+  const srcDone = srcTask.status === 'completed' ? 1 : 0;
+  const tgtDone = tgtTask.status === 'completed' ? 1 : 0;
+  if (srcDone !== tgtDone) return;
+  card.classList.add('drag-over');
+}
+
+function onDragLeave(e) {
+  const card = e.target.closest('.task-card');
+  if (card) card.classList.remove('drag-over');
+}
+
+async function onDrop(e) {
+  e.preventDefault();
+  const card = e.target.closest('.task-card');
+  if (card) card.classList.remove('drag-over');
+  if (!dragSrcId) return;
+  const targetId = card ? parseInt(card.dataset.taskId) : null;
+  if (!targetId || targetId === dragSrcId) { dragSrcId = null; return; }
+
+  const srcTask = tasks.find(t => t.id === dragSrcId);
+  const tgtTask = tasks.find(t => t.id === targetId);
+  if (!srcTask || !tgtTask) { dragSrcId = null; return; }
+  const srcDone = srcTask.status === 'completed' ? 1 : 0;
+  const tgtDone = tgtTask.status === 'completed' ? 1 : 0;
+  if (srcDone !== tgtDone) { dragSrcId = null; return; }
+
+  const taskList = [...tasks];
+  const srcIdx = taskList.findIndex(t => t.id === dragSrcId);
+  const tgtIdx = taskList.findIndex(t => t.id === targetId);
+  if (srcIdx < 0 || tgtIdx < 0) { dragSrcId = null; return; }
+
+  taskList.splice(srcIdx, 1);
+  const newTgtIdx = taskList.findIndex(t => t.id === targetId);
+  taskList.splice(newTgtIdx + 1, 0, srcTask);
+
+  tasks = taskList;
+  renderTasks();
+
+  const taskIds = tasks.map(t => t.id);
+  await window.electronAPI.batchReorderTasks(currentCategoryId, taskIds);
+
+  dragSrcId = null;
 }
 
 async function handleQuickComplete(taskId) {
@@ -503,6 +585,8 @@ async function openTaskModal(taskId) {
   $('taskTitle').value = openedTask.title;
   $('taskDesc').value = openedTask.description || '';
 
+  populateTaskCategorySelect(openedTask.category_id);
+
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
 
@@ -580,6 +664,18 @@ function autoSaveDescription(value) {
   }).catch(() => {});
 }
 
+function populateTaskCategorySelect(currentCategoryId) {
+  const sel = $('taskCategory');
+  sel.innerHTML = '';
+  for (const cat of categories) {
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    if (cat.id === currentCategoryId) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
 async function closeTaskModal() {
   await autoSaveRoutineQuantity();
   $('modalOverlay').classList.remove('show');
@@ -643,7 +739,7 @@ function renderStages(task) {
     div.className = 'stage-item';
     const isLast = s.stage_index === stages.length;
     const isFirst = s.stage_index === 1;
-    const hasNote = s.note && s.note.trim() !== '';
+    const isCompleted = s.is_completed == 1;
     let statusLabel = '';
     if (isFirst && stages.length === 1) statusLabel = ' (当前阶段)';
     else if (isLast) statusLabel = ' (最新阶段)';
@@ -654,7 +750,10 @@ function renderStages(task) {
         <div class="stage-note" data-stage-id="${s.id}" title="点击编辑备注">${escapeHtml(s.note || '无备注')}</div>
         <div class="stage-time">创建: ${formatDateTime(s.created_at)} | 更新: ${formatDateTime(s.updated_at)}</div>
       </div>
-      <div class="stage-progress ${hasNote ? 'filled' : 'empty'}" title="${hasNote ? '已完成' : '未完成'}">${hasNote ? '✓' : '—'}</div>
+      <label class="stage-check ${isCompleted ? 'checked' : ''}" title="${isCompleted ? '已完成' : '未完成'}">
+        <input type="checkbox" class="stage-check-input" data-stage-id="${s.id}" ${isCompleted ? 'checked' : ''}>
+        <span class="stage-check-mark">${isCompleted ? '✓' : '—'}</span>
+      </label>
       <button class="btn-stage-delete" data-stage-id="${s.id}" title="删除阶段">×</button>
     `;
 
@@ -664,9 +763,22 @@ function renderStages(task) {
       startStageNoteEdit(s, noteEl);
     });
 
+    const checkbox = div.querySelector('.stage-check-input');
+    checkbox.addEventListener('change', async (e) => {
+      e.stopPropagation();
+      await window.electronAPI.updateStage({
+        id: s.id,
+        is_completed: checkbox.checked ? 1 : 0
+      });
+      await refreshOpenedTask();
+      renderStages(openedTask);
+      updateStatusBadge(openedTask.status);
+      updateStatusButtons(openedTask.status);
+    });
+
     div.querySelector('.btn-stage-delete').addEventListener('click', async (e) => {
       e.stopPropagation();
-      if (hasNote && !confirm(`确定删除第 ${s.stage_index} 阶段？该阶段已填写备注。`)) return;
+      if (isCompleted && !confirm(`确定删除第 ${s.stage_index} 阶段？该阶段已标记为完成。`)) return;
       await window.electronAPI.deleteStage(s.id);
       await refreshOpenedTask();
       renderStages(openedTask);
@@ -679,18 +791,16 @@ function renderStages(task) {
 }
 
 function startStageNoteEdit(stage, el) {
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.value = stage.note || '';
-  input.className = 'input';
-  input.style.cssText = 'font-size:14px;padding:4px 8px;';
+  const textarea = document.createElement('textarea');
+  textarea.value = stage.note || '';
+  textarea.className = 'textarea';
+  textarea.style.cssText = 'font-size:14px;padding:4px 8px;min-height:60px;resize:vertical;';
 
-  el.replaceWith(input);
-  input.focus();
-  input.select();
+  el.replaceWith(textarea);
+  textarea.focus();
 
   const finish = async () => {
-    const newNote = input.value.trim();
+    const newNote = textarea.value.trimEnd();
     if (newNote !== (stage.note || '')) {
       await window.electronAPI.updateStage({
         id: stage.id,
@@ -703,11 +813,10 @@ function startStageNoteEdit(stage, el) {
     updateStatusButtons(openedTask.status);
   };
 
-  input.addEventListener('blur', finish);
-  input.addEventListener('keydown', (e) => {
-    if (e.key === 'Enter') finish();
+  textarea.addEventListener('blur', finish);
+  textarea.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      input.value = stage.note || '';
+      textarea.value = stage.note || '';
       finish();
     }
   });
@@ -764,7 +873,7 @@ $('btnStatusComplete').onclick = async () => {
 $('btnStatusRevert').onclick = async () => {
   if (!openedTask) return;
   const stages = openedTask.stages || [];
-  const filledCount = stages.filter(s => s.note && s.note.trim() !== '').length;
+  const filledCount = stages.filter(s => s.is_completed == 1).length;
   const avgProgress = stages.length > 0
     ? Math.round((filledCount / stages.length) * 100)
     : 0;
@@ -883,6 +992,11 @@ async function saveAndCloseTaskModal() {
   if (!openedTask) { await closeTaskModal(); return; }
   const title = $('taskTitle').value.trim();
   if (!title) { await closeTaskModal(); return; }
+
+  const newCategoryId = parseInt($('taskCategory').value);
+  if (newCategoryId && newCategoryId !== openedTask.category_id) {
+    await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
+  }
 
   openedTask.title = title;
   openedTask.description = $('taskDesc').value;
@@ -1079,6 +1193,7 @@ function switchMonthFromSelects() {
 // Bulk actions
 $('btnBulkComplete').onclick = handleBulkComplete;
 $('btnBulkDelete').onclick = handleBulkDelete;
+$('btnBulkMove').onclick = openBulkMoveModal;
 $('btnBulkCancel').onclick = () => {
   selectedTaskIds.clear();
   updateBulkBar();
@@ -1148,7 +1263,7 @@ async function loadOverviewData() {
             <span class="overview-task-title">${escapeHtml(t.title)}</span>
           </div>`;
       }
-      card.innerHTML = `<h3>${months[m - 1]} (${tasksForMonth.length})</h3>${itemsHtml}`;
+      card.innerHTML = `<h3>${months[m - 1]} (${tasksForMonth.length})</h3><div class="overview-task-list">${itemsHtml}</div>`;
     }
 
     card.querySelectorAll('.overview-task-item').forEach(item => {
@@ -1173,5 +1288,36 @@ async function loadOverviewData() {
     grid.appendChild(card);
   }
 }
+
+// Bulk move category modal
+function openBulkMoveModal() {
+  $('bulkMoveText').textContent = `将选中的 ${selectedTaskIds.size} 个任务切换到以下分类：`;
+  const sel = $('bulkMoveCategory');
+  sel.innerHTML = '';
+  for (const cat of categories) {
+    if (cat.id === currentCategoryId) continue;
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    sel.appendChild(opt);
+  }
+  $('bulkMoveModalOverlay').classList.add('show');
+}
+
+function closeBulkMoveModal() {
+  $('bulkMoveModalOverlay').classList.remove('show');
+}
+
+$('btnCloseBulkMoveModal').onclick = closeBulkMoveModal;
+$('bulkMoveModalOverlay').onclick = (e) => { if (e.target === $('bulkMoveModalOverlay')) closeBulkMoveModal(); };
+$('btnConfirmBulkMove').onclick = async () => {
+  const newCategoryId = parseInt($('bulkMoveCategory').value);
+  if (!newCategoryId) return;
+  await window.electronAPI.bulkChangeTaskCategory([...selectedTaskIds], newCategoryId);
+  selectedTaskIds.clear();
+  updateBulkBar();
+  closeBulkMoveModal();
+  await loadTasks(currentCategoryId);
+};
 
 init();

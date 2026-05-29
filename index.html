@@ -29,6 +29,7 @@
         <span id="bulkCount">已选择 0 项</span>
         <button class="btn btn-sm" id="btnBulkComplete">批量完成</button>
         <button class="btn btn-sm btn-danger" id="btnBulkDelete">批量删除</button>
+        <button class="btn btn-sm" id="btnBulkMove">批量切换分类</button>
         <button class="btn btn-sm" id="btnBulkCancel">取消</button>
       </div>
       <div class="filter-info" id="filterInfo"></div>
@@ -53,6 +54,10 @@
           <input type="text" id="taskTitle" class="input">
         </div>
 
+        <div class="form-row">
+          <label>分类</label>
+          <select id="taskCategory" class="input" style="width:200px;"></select>
+        </div>
         <div class="form-row">
           <label>文本描述 / 工作思路 / STAR总结</label>
           <textarea id="taskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
@@ -230,6 +235,26 @@
           <select id="overviewYearSelect" class="input" style="width:120px;"></select>
         </div>
         <div class="overview-grid" id="overviewGrid"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Bulk Move Category -->
+  <div class="modal-overlay" id="bulkMoveModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>📂 切换到其他分类</h2>
+        <button class="btn-close" id="btnCloseBulkMoveModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="bulkMoveText" style="margin-bottom:12px;"></p>
+        <div class="form-row">
+          <label>目标分类</label>
+          <select id="bulkMoveCategory" class="input"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnConfirmBulkMove">确认切换</button>
       </div>
     </div>
   </div>

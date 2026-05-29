@@ -14,8 +14,8 @@ const SHEETS = {
 const HEADERS = {
   meta: ['key', 'value'],
   categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at'],
-  tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at'],
-  stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at'],
+  tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order'],
+  stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
   routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'],
   carry_overs: ['task_id', 'year_month', 'carried_at']
 };
@@ -31,13 +31,14 @@ class ExcelDB {
     if (fs.existsSync(this.filePath)) {
       const buffer = fs.readFileSync(this.filePath);
       this.workbook = xlsx.read(buffer, { type: 'buffer', cellDates: true });
-      // Ensure all sheets exist (backward compatibility)
       for (const name of Object.values(SHEETS)) {
         if (!this.workbook.Sheets[name]) {
           const ws = xlsx.utils.aoa_to_sheet([HEADERS[name]]);
           xlsx.utils.book_append_sheet(this.workbook, ws, name);
         }
       }
+      this._migrateTaskSortOrder();
+      this._migrateStageCompleted();
     } else {
       this.workbook = xlsx.utils.book_new();
       for (const name of Object.values(SHEETS)) {
@@ -55,6 +56,65 @@ class ExcelDB {
       this._setMeta('last_routine_id', 0);
       this.save();
     }
+  }
+
+  _migrateTaskSortOrder() {
+    const ws = this._getSheet(SHEETS.tasks);
+    if (!ws) return;
+    const data = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (data.length < 2) return;
+    const headerRow = data[0];
+    if (headerRow.length >= HEADERS.tasks.length) return;
+
+    const tasksByCategory = {};
+    for (let i = 1; i < data.length; i++) {
+      const row = data[i];
+      const catId = row[1];
+      if (!tasksByCategory[catId]) tasksByCategory[catId] = [];
+      tasksByCategory[catId].push(row);
+    }
+
+    for (const catId of Object.keys(tasksByCategory)) {
+      const rows = tasksByCategory[catId];
+      rows.sort((a, b) => {
+        const aDone = a[4] === 'completed' ? 1 : 0;
+        const bDone = b[4] === 'completed' ? 1 : 0;
+        if (aDone !== bDone) return aDone - bDone;
+        return (b[7] || '').localeCompare(a[7] || '');
+      });
+      rows.forEach((row, idx) => {
+        while (row.length < HEADERS.tasks.length) row.push('');
+        row[10] = idx + 1;
+      });
+    }
+
+    const allRows = [HEADERS.tasks];
+    for (const rows of Object.values(tasksByCategory)) {
+      for (const row of rows) {
+        allRows.push(row);
+      }
+    }
+    const newWs = xlsx.utils.aoa_to_sheet(allRows);
+    this.workbook.Sheets[SHEETS.tasks] = newWs;
+    this.save();
+  }
+
+  _migrateStageCompleted() {
+    const ws = this._getSheet(SHEETS.stages);
+    if (!ws) return;
+    const data = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (data.length < 2) return;
+    const headerRow = data[0];
+    if (headerRow.length >= HEADERS.stages.length) return;
+
+    for (let i = 1; i < data.length; i++) {
+      while (data[i].length < HEADERS.stages.length) data[i].push('');
+      data[i][7] = data[i][3] && String(data[i][3]).trim() !== '' ? 1 : 0;
+    }
+
+    const newWs = xlsx.utils.aoa_to_sheet([HEADERS.stages, ...data.slice(1)]);
+    this.workbook.Sheets[SHEETS.stages] = newWs;
+    this.save();
   }
 
   save() {
@@ -175,7 +235,7 @@ class ExcelDB {
   getTaskById(taskId) {
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
     }));
     const task = allTasks.find(t => t.id == taskId);
     if (!task) return null;
@@ -184,7 +244,7 @@ class ExcelDB {
     } else {
       task.stages = this._sheetToJson(SHEETS.stages)
         .filter(r => r[1] == task.id)
-        .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6] }))
+        .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6], is_completed: r[7] }))
         .sort((a, b) => a.stage_index - b.stage_index);
     }
     return task;
@@ -193,7 +253,7 @@ class ExcelDB {
   getTasks(categoryId, yearMonth) {
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
     }));
     const tasks = allTasks.filter(t => t.category_id == categoryId);
     const carried = this.getCarriedTasks(categoryId, yearMonth);
@@ -215,7 +275,7 @@ class ExcelDB {
       } else {
         const stages = this._sheetToJson(SHEETS.stages)
           .filter(r => r[1] == task.id)
-          .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6] }))
+          .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6], is_completed: r[7] }))
           .sort((a, b) => a.stage_index - b.stage_index);
 
         if (yearMonth) {
@@ -247,9 +307,14 @@ class ExcelDB {
     const id = this._nextId('task');
     const now = new Date().toISOString();
     const createdAt = task.createdAt || now;
+    const allTaskRows = this._sheetToJson(SHEETS.tasks).filter(r => r[1] == task.categoryId);
+    for (const row of allTaskRows) {
+      row[10] = (parseInt(row[10]) || 0) + 1;
+    }
+    this._replaceSheet(SHEETS.tasks, allTaskRows);
     this._appendRows(SHEETS.tasks, [[
       id, task.categoryId, task.title, task.description || '', task.status || 'created',
-      task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', ''
+      task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', '', 1
     ]]);
     this.save();
     return id;
@@ -277,7 +342,27 @@ class ExcelDB {
       completed = '';
     }
 
-    rows[idx] = [task.id, existing[1], task.title, task.description || '', task.status, progress, existing[6], existing[7], started, completed];
+    rows[idx] = [task.id, existing[1], task.title, task.description || '', task.status, progress, existing[6], existing[7], started, completed, existing[10]];
+    this._replaceSheet(SHEETS.tasks, rows);
+    this.save();
+  }
+
+  changeTaskCategory(taskId, newCategoryId) {
+    const rows = this._sheetToJson(SHEETS.tasks);
+    const idx = rows.findIndex(r => r[0] == taskId);
+    if (idx < 0) return;
+    rows[idx][1] = newCategoryId;
+    this._replaceSheet(SHEETS.tasks, rows);
+    this.save();
+  }
+
+  bulkChangeTaskCategory(taskIds, newCategoryId) {
+    const rows = this._sheetToJson(SHEETS.tasks);
+    for (const row of rows) {
+      if (taskIds.includes(row[0])) {
+        row[1] = newCategoryId;
+      }
+    }
     this._replaceSheet(SHEETS.tasks, rows);
     this.save();
   }
@@ -296,7 +381,7 @@ class ExcelDB {
   getStages(taskId) {
     return this._sheetToJson(SHEETS.stages)
       .filter(r => r[1] == taskId)
-      .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6] }))
+      .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6], is_completed: r[7] }))
       .sort((a, b) => b.stage_index - a.stage_index);
   }
 
@@ -308,11 +393,11 @@ class ExcelDB {
     const now = new Date().toISOString();
 
     const stageRows = this._sheetToJson(SHEETS.stages);
-    stageRows.push([id, stage.taskId, nextIndex, stage.note || '', 0, now, now]);
+    stageRows.push([id, stage.taskId, nextIndex, stage.note || '', 0, now, now, 0]);
     this._replaceSheet(SHEETS.stages, stageRows);
 
     const allStages = stageRows.filter(r => r[1] == stage.taskId);
-    const filledCount = allStages.filter(r => r[3] && String(r[3]).trim() !== '').length;
+    const filledCount = allStages.filter(r => r[7] == 1).length;
     const progress = allStages.length > 0 ? Math.round((filledCount / allStages.length) * 100) : 0;
 
     const taskRows = this._sheetToJson(SHEETS.tasks);
@@ -333,13 +418,14 @@ class ExcelDB {
     const rows = this._sheetToJson(SHEETS.stages);
     const idx = rows.findIndex(r => r[0] == stage.id);
     if (idx >= 0) {
-      rows[idx][3] = stage.note || '';
+      if (stage.note !== undefined) rows[idx][3] = stage.note || '';
+      if (stage.is_completed !== undefined) rows[idx][7] = stage.is_completed;
       rows[idx][6] = new Date().toISOString();
       this._replaceSheet(SHEETS.stages, rows);
 
       const taskId = rows[idx][1];
       const taskStages = rows.filter(r => r[1] == taskId);
-      const filledCount = taskStages.filter(r => r[3] && String(r[3]).trim() !== '').length;
+      const filledCount = taskStages.filter(r => r[7] == 1).length;
       const progress = taskStages.length > 0 ? Math.round((filledCount / taskStages.length) * 100) : 0;
 
       const taskRows = this._sheetToJson(SHEETS.tasks);
@@ -362,7 +448,7 @@ class ExcelDB {
     this._replaceSheet(SHEETS.stages, filtered);
 
     const taskStages = filtered.filter(r => r[1] == taskId);
-    const filledCount = taskStages.filter(r => r[3] && String(r[3]).trim() !== '').length;
+    const filledCount = taskStages.filter(r => r[7] == 1).length;
     const progress = taskStages.length > 0 ? Math.round((filledCount / taskStages.length) * 100) : 0;
 
     const taskRows = this._sheetToJson(SHEETS.tasks);
@@ -430,7 +516,7 @@ class ExcelDB {
   getExportData() {
     const tasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
     }));
     const cats = this.getCategories();
     for (const task of tasks) {
@@ -443,7 +529,7 @@ class ExcelDB {
       } else {
         task.stages = this._sheetToJson(SHEETS.stages)
           .filter(r => r[1] == task.id)
-          .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6] }))
+          .map(r => ({ id: r[0], task_id: r[1], stage_index: r[2], note: r[3], progress_value: r[4], created_at: r[5], updated_at: r[6], is_completed: r[7] }))
           .sort((a, b) => a.stage_index - b.stage_index);
       }
     }
@@ -455,7 +541,7 @@ class ExcelDB {
       .filter(r => r[1] == categoryId && r[6] == 1)
       .map(r => ({
         id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-        progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+        progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
       }));
   }
 
@@ -539,7 +625,7 @@ class ExcelDB {
     const cats = this.getCategories();
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
     }));
 
     const result = {};
@@ -596,6 +682,20 @@ class ExcelDB {
     }
 
     return result;
+  }
+
+  batchReorderTasks(categoryId, taskIds) {
+    const rows = this._sheetToJson(SHEETS.tasks);
+    for (const row of rows) {
+      if (row[1] == categoryId) {
+        const pos = taskIds.indexOf(row[0]);
+        if (pos >= 0) {
+          row[10] = pos + 1;
+        }
+      }
+    }
+    this._replaceSheet(SHEETS.tasks, rows);
+    this.save();
   }
 }
 
