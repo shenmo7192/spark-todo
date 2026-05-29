@@ -1487,9 +1487,10 @@ $('importConfirmModalOverlay').onclick = (e) => { if (e.target === $('importConf
 
 $('btnImportReplace').onclick = async () => {
   if (!pendingImportData) return;
+  const importData = pendingImportData;
   closeImportConfirm();
   try {
-    await window.electronAPI.importData(pendingImportData, 'replace');
+    await window.electronAPI.importData(importData, 'replace');
     alert('数据已导入（替换模式），正在刷新...');
     await loadCategories();
     if (currentCategoryId) await loadTasks(currentCategoryId);
@@ -1502,9 +1503,10 @@ $('btnImportReplace').onclick = async () => {
 
 $('btnImportMerge').onclick = async () => {
   if (!pendingImportData) return;
+  const importData = pendingImportData;
   closeImportConfirm();
   try {
-    await window.electronAPI.importData(pendingImportData, 'merge');
+    await window.electronAPI.importData(importData, 'merge');
     alert('数据已导入（合并模式），正在刷新...');
     await loadCategories();
     if (currentCategoryId) await loadTasks(currentCategoryId);
