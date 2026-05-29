@@ -239,6 +239,8 @@ body {
   border: 1px solid var(--border); cursor: pointer;
 }
 .month-select:focus { outline: none; border-color: var(--primary); }
+#yearSelect { width: 90px; }
+#monthSelect { width: 75px; }
 
 /* Bulk bar */
 .bulk-bar {

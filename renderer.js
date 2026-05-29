@@ -40,9 +40,10 @@ let globalNoteTimer = null;
 async function init() {
   currentYearMonth = getNowYearMonth();
   await loadAllMonths();
-  populateMonthSelect();
+  populateYearMonthSelects();
   populateExportMonthSelects();
-  $('monthSelect').value = currentYearMonth;
+  $('monthSelect').value = currentYearMonth.substring(5);
+  $('yearSelect').value = currentYearMonth.substring(0, 4);
   await loadCategories();
   await checkAllRoutineReminders();
 }
@@ -54,14 +55,25 @@ async function loadAllMonths() {
   allMonths = Array.from(set).filter(Boolean).sort();
 }
 
-function populateMonthSelect() {
-  const sel = $('monthSelect');
-  sel.innerHTML = '';
-  for (const ym of allMonths) {
+function populateYearMonthSelects() {
+  const yearSel = $('yearSelect');
+  yearSel.innerHTML = '';
+  const currentYear = new Date().getFullYear();
+  for (let y = currentYear - 20; y <= currentYear + 1; y++) {
     const opt = document.createElement('option');
-    opt.value = ym;
-    opt.textContent = ym;
-    sel.appendChild(opt);
+    opt.value = y;
+    opt.textContent = y + '年';
+    yearSel.appendChild(opt);
+  }
+
+  const monthSel = $('monthSelect');
+  monthSel.innerHTML = '';
+  for (let m = 1; m <= 12; m++) {
+    const val = String(m).padStart(2, '0');
+    const opt = document.createElement('option');
+    opt.value = val;
+    opt.textContent = val + '月';
+    monthSel.appendChild(opt);
   }
 }
 
@@ -94,15 +106,17 @@ function populateExportMonthSelects() {
 
 async function switchMonth(ym) {
   currentYearMonth = ym;
+  $('yearSelect').value = ym.substring(0, 4);
+  $('monthSelect').value = ym.substring(5);
   await loadTasks(currentCategoryId);
 }
 
 async function loadCategories() {
   categories = await window.electronAPI.getCategories();
-  renderTabs();
   if (categories.length && !currentCategoryId) {
     currentCategoryId = categories[0].id;
   }
+  renderTabs();
   if (currentCategoryId) {
     await loadTasks(currentCategoryId);
   }
@@ -546,10 +560,24 @@ function autoSaveDescription(value) {
   }).catch(() => {});
 }
 
-function closeTaskModal() {
+async function closeTaskModal() {
+  await autoSaveRoutineQuantity();
   $('modalOverlay').classList.remove('show');
   openedTask = null;
   clearTimeout(globalNoteTimer);
+}
+
+async function autoSaveRoutineQuantity() {
+  if (!openedTask) return;
+  const qtyVal = $('routineQty');
+  if (!qtyVal || qtyVal.value === '') return;
+  const qty = parseFloat(qtyVal.value);
+  if (isNaN(qty)) return;
+  await window.electronAPI.fillRoutine({
+    taskId: openedTask.id,
+    yearMonth: currentYearMonth,
+    quantity: qty
+  });
 }
 
 function updateStatusBadge(status) {
@@ -780,14 +808,16 @@ $('btnBackfillRoutine').onclick = async () => {
   });
   $('backfillPanel').style.display = 'none';
   $('routineInfo').innerHTML = `上月(${lastYm})已补填: <strong>${qty}</strong> ✓`;
+  await loadAllMonths();
+  populateExportMonthSelects();
   await refreshOpenedTask();
   await loadTasks(currentCategoryId);
 };
 
 async function saveAndCloseTaskModal() {
-  if (!openedTask) { closeTaskModal(); return; }
+  if (!openedTask) { await closeTaskModal(); return; }
   const title = $('taskTitle').value.trim();
-  if (!title) { closeTaskModal(); return; }
+  if (!title) { await closeTaskModal(); return; }
 
   openedTask.title = title;
   openedTask.description = $('taskDesc').value;
@@ -800,7 +830,7 @@ async function saveAndCloseTaskModal() {
     progress: openedTask.progress
   });
 
-  closeTaskModal();
+  await closeTaskModal();
   await loadTasks(currentCategoryId);
 }
 
@@ -866,7 +896,6 @@ $('btnConfirmNewTask').onclick = async () => {
     closeNewTaskModal();
     await loadTasks(currentCategoryId);
     await loadAllMonths();
-    populateMonthSelect();
     populateExportMonthSelects();
   } catch (e) {
     alert('创建任务失败: ' + (e.message || '未知错误'));
@@ -959,9 +988,19 @@ $('btnConfirmDelete').onclick = async () => {
 };
 
 // Month select
-$('monthSelect').onchange = (e) => {
-  switchMonth(e.target.value);
-};
+$('yearSelect').onchange = () => switchMonthFromSelects();
+$('monthSelect').onchange = () => switchMonthFromSelects();
+
+function switchMonthFromSelects() {
+  const year = $('yearSelect').value;
+  const month = $('monthSelect').value;
+  if (year && month) {
+    const ym = `${year}-${month}`;
+    if (ym !== currentYearMonth) {
+      switchMonth(ym);
+    }
+  }
+}
 
 // Bulk actions
 $('btnBulkComplete').onclick = handleBulkComplete;
