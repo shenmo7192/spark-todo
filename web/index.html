@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Spark Todo 星火工单系统</title>
-  <link rel="stylesheet" href="styles.css">
+  <title>Spark Todo 星火工单系统 (Web)</title>
+  <link rel="stylesheet" href="../styles.css">
 </head>
 <body>
   <div class="app">
@@ -20,7 +20,6 @@
     </header>
 
     <div class="tab-bar" id="tabBar">
-      <!-- Tabs injected by JS -->
       <button class="tab tab-add" id="btnAddCategory" title="添加分类">+</button>
     </div>
 
@@ -36,9 +35,7 @@
       <div class="filter-info" id="filterInfo"></div>
     </div>
 
-    <div class="task-list" id="taskList">
-      <!-- Tasks injected by JS -->
-    </div>
+    <div class="task-list" id="taskList"></div>
   </div>
 
   <!-- Modal: Task Detail -->
@@ -54,7 +51,6 @@
           <label>任务名称</label>
           <input type="text" id="taskTitle" class="input">
         </div>
-
         <div class="form-row">
           <label>分类</label>
           <select id="taskCategory" class="input" style="width:200px;"></select>
@@ -63,7 +59,6 @@
           <label>文本描述 / 工作思路 / STAR总结</label>
           <textarea id="taskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
         </div>
-
         <div class="form-row" id="routinePanel" style="display:none;">
           <label>📋 本月填报 (<span id="routineLabelMonth"></span>)</label>
           <div class="routine-inputs">
@@ -84,7 +79,6 @@
             <span id="endRoutineInfo" style="font-size:12px;color:var(--text-secondary);margin-left:8px;display:none;"></span>
           </div>
         </div>
-
         <div class="form-row" id="statusPanel">
           <label>当前状态</label>
           <div class="status-bar">
@@ -97,7 +91,6 @@
             </div>
           </div>
         </div>
-
         <div class="form-row" id="stagePanel">
           <label>阶段进度</label>
           <div class="stage-add">
@@ -106,7 +99,6 @@
           </div>
           <div class="stage-list" id="stageList"></div>
         </div>
-
         <div class="form-row times">
           <div class="time-item"><strong>创建时间:</strong> <span id="timeCreated">-</span></div>
           <div class="time-item"><strong>开始时间:</strong> <span id="timeStarted">-</span></div>
@@ -133,9 +125,7 @@
           <input type="text" id="catName" class="input">
         </div>
         <div class="form-row">
-          <label>
-            <input type="checkbox" id="catIsRoutine"> 日常工作 (每月自动刷新)
-          </label>
+          <label><input type="checkbox" id="catIsRoutine"> 日常工作 (每月自动刷新)</label>
         </div>
       </div>
       <div class="modal-footer">
@@ -147,9 +137,7 @@
   <!-- Modal: Routine Reminder -->
   <div class="modal-overlay" id="remindModalOverlay">
     <div class="modal modal-sm">
-      <div class="modal-header">
-        <h2>⏰ 上月日常工作未填报</h2>
-      </div>
+      <div class="modal-header"><h2>⏰ 上月日常工作未填报</h2></div>
       <div class="modal-body">
         <p id="remindText">以下日常工作上月未填报，请先补填：</p>
         <ul id="remindList"></ul>
@@ -197,10 +185,14 @@
   <div class="modal-overlay" id="exportModalOverlay">
     <div class="modal modal-sm">
       <div class="modal-header">
-        <h2>导出Excel台账</h2>
+        <h2>📥 导出Excel台账</h2>
         <button class="btn-close" id="btnCloseExportModal">&times;</button>
       </div>
       <div class="modal-body">
+        <div class="form-row">
+          <label>导出前缀 (可选，浏览器将自动下载)</label>
+          <input type="text" id="exportDirPath" class="input" placeholder="例如: 台账_2024年">
+        </div>
         <div class="form-row">
           <label>起始月份</label>
           <select id="exportStartMonth" class="input"></select>
@@ -208,13 +200,6 @@
         <div class="form-row">
           <label>结束月份</label>
           <select id="exportEndMonth" class="input"></select>
-        </div>
-        <div class="form-row">
-          <label>导出目录</label>
-          <div class="path-input">
-            <input type="text" id="exportDirPath" class="input" readonly placeholder="请选择导出目录">
-            <button class="btn" id="btnChooseExportDir">选择目录</button>
-          </div>
         </div>
       </div>
       <div class="modal-footer">
@@ -263,13 +248,8 @@
   <!-- Modal: Delete Confirm -->
   <div class="modal-overlay" id="deleteModalOverlay">
     <div class="modal modal-sm">
-      <div class="modal-header">
-        <h2>⚠️ 确认删除</h2>
-        <button class="btn-close" id="btnCloseDeleteModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p id="deleteConfirmText">确定删除该任务？此操作不可恢复。</p>
-      </div>
+      <div class="modal-header"><h2>⚠️ 确认删除</h2><button class="btn-close" id="btnCloseDeleteModal">&times;</button></div>
+      <div class="modal-body"><p id="deleteConfirmText">确定删除该任务？此操作不可恢复。</p></div>
       <div class="modal-footer">
         <button class="btn" id="btnCancelDelete">取消</button>
         <button class="btn btn-danger" id="btnConfirmDelete">删除</button>
@@ -290,15 +270,16 @@
           <div class="settings-actions">
             <button class="btn btn-settings-action" id="btnExportDB">📤 导出数据备份 (ExcelDB)</button>
             <button class="btn btn-settings-action" id="btnImportDB">📥 导入数据备份 (ExcelDB)</button>
+            <input type="file" id="importFileInput" accept=".xlsx" style="display:none;">
           </div>
         </div>
         <div class="settings-section">
           <h3>ℹ️ 关于</h3>
           <div class="about-info">
             <p><strong>Spark Todo 星火工单系统</strong></p>
-            <p>版本: <span id="settingsVersion">-</span></p>
-            <p>数据架构版本: <span id="settingsDbSchema">-</span></p>
-            <p>平台: <span id="settingsPlatform">Electron</span></p>
+            <p>版本: <span id="settingsVersion">1.1.0</span></p>
+            <p>数据架构版本: <span id="settingsDbSchema">1</span></p>
+            <p>平台: <span id="settingsPlatform">Web</span></p>
           </div>
         </div>
       </div>
@@ -321,6 +302,9 @@
     </div>
   </div>
 
-  <script src="renderer.js"></script>
+  <script src="../src/xlsx.full.min.js"></script>
+  <script src="../src/db-web.js"></script>
+  <script src="../src/api-web.js"></script>
+  <script src="../renderer.js"></script>
 </body>
 </html>

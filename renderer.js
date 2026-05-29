@@ -1320,4 +1320,160 @@ $('btnConfirmBulkMove').onclick = async () => {
   await loadTasks(currentCategoryId);
 };
 
+// Settings modal
+let pendingImportData = null;
+
+function openSettingsModal() {
+  $('settingsModalOverlay').classList.add('show');
+  loadSettingsInfo();
+}
+
+function closeSettingsModal() {
+  $('settingsModalOverlay').classList.remove('show');
+}
+
+async function loadSettingsInfo() {
+  const isWeb = typeof window.electronAPI.getVersion === 'function';
+  if (isWeb) {
+    try {
+      const ver = await window.electronAPI.getVersion();
+      const schema = await window.electronAPI.getDbSchemaVersion();
+      $('settingsVersion').textContent = ver;
+      $('settingsDbSchema').textContent = schema;
+    } catch (e) {
+      $('settingsVersion').textContent = '1.1.0';
+      $('settingsDbSchema').textContent = '1';
+    }
+    $('settingsPlatform').textContent = 'Web (浏览器)';
+  } else {
+    $('settingsVersion').textContent = '1.1.0';
+    $('settingsDbSchema').textContent = '1';
+    $('settingsPlatform').textContent = 'Electron';
+  }
+}
+
+$('btnSettings').onclick = openSettingsModal;
+$('btnCloseSettingsModal').onclick = closeSettingsModal;
+$('settingsModalOverlay').onclick = (e) => { if (e.target === $('settingsModalOverlay')) closeSettingsModal(); };
+
+$('btnExportDB').onclick = async () => {
+  const isWeb = typeof window.electronAPI.getVersion === 'function';
+  if (isWeb) {
+    closeSettingsModal();
+    await window.electronAPI.exportExcelDB();
+  } else {
+    const result = await window.electronAPI.showSaveDialog({
+      title: '导出数据备份',
+      defaultPath: `SparkTodo_备份_${new Date().toISOString().substring(0, 10)}.xlsx`,
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
+    });
+    if (!result.canceled && result.filePath) {
+      const res = await window.electronAPI.exportExcelDB(result.filePath);
+      if (res.success) {
+        alert('数据备份导出成功！');
+        closeSettingsModal();
+      } else {
+        alert('导出失败: ' + (res.error || '未知错误'));
+      }
+    }
+  }
+};
+
+$('btnImportDB').onclick = async () => {
+  const isWeb = typeof window.electronAPI.getVersion === 'function';
+  if (isWeb) {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.xlsx';
+    input.onchange = async (e) => {
+      const file = e.target.files[0];
+      if (!file) return;
+      closeSettingsModal();
+      try {
+        const parsed = await window.electronAPI.importExcelDB(file);
+        pendingImportData = parsed.data;
+        showImportConfirm(parsed);
+      } catch (err) {
+        alert('文件读取失败: ' + err.message);
+      }
+    };
+    input.click();
+  } else {
+    const result = await window.electronAPI.showOpenDialog({
+      title: '选择数据备份文件',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+      properties: ['openFile']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      closeSettingsModal();
+      try {
+        const parsed = await window.electronAPI.importExcelDB(result.filePaths[0]);
+        pendingImportData = parsed.data;
+        showImportConfirm(parsed);
+      } catch (err) {
+        alert('文件读取失败: ' + err.message);
+      }
+    }
+  }
+};
+
+function showImportConfirm(parsed) {
+  const catCount = parsed.data.categories ? parsed.data.categories.length : 0;
+  const taskCount = parsed.data.tasks ? parsed.data.tasks.length : 0;
+  const stageCount = parsed.data.stages ? parsed.data.stages.length : 0;
+
+  $('importConfirmBody').innerHTML = `
+    <p>检测到数据文件：</p>
+    <div class="about-info" style="margin:10px 0;">
+      <p>📦 文件版本: <strong>${parsed.version}</strong></p>
+      <p>📐 数据架构: <strong>v${parsed.schemaVersion}</strong></p>
+      <p>📂 分类: <strong>${catCount}</strong> 个</p>
+      <p>📋 任务: <strong>${taskCount}</strong> 条</p>
+      <p>📝 阶段: <strong>${stageCount}</strong> 条</p>
+    </div>
+    <p style="color:var(--text-secondary);font-size:13px;">请选择导入方式：</p>
+  `;
+
+  $('importConfirmModalOverlay').classList.add('show');
+}
+
+function closeImportConfirm() {
+  $('importConfirmModalOverlay').classList.remove('show');
+  pendingImportData = null;
+}
+
+$('btnCloseImportConfirmModal').onclick = closeImportConfirm;
+$('btnImportCancel').onclick = closeImportConfirm;
+$('importConfirmModalOverlay').onclick = (e) => { if (e.target === $('importConfirmModalOverlay')) closeImportConfirm(); };
+
+$('btnImportReplace').onclick = async () => {
+  if (!pendingImportData) return;
+  closeImportConfirm();
+  try {
+    await window.electronAPI.importData(pendingImportData, 'replace');
+    alert('数据已导入（替换模式），正在刷新...');
+    await loadCategories();
+    if (currentCategoryId) await loadTasks(currentCategoryId);
+    await loadAllMonths();
+    populateExportMonthSelects();
+  } catch (err) {
+    alert('导入失败: ' + err.message);
+  }
+};
+
+$('btnImportMerge').onclick = async () => {
+  if (!pendingImportData) return;
+  closeImportConfirm();
+  try {
+    await window.electronAPI.importData(pendingImportData, 'merge');
+    alert('数据已导入（合并模式），正在刷新...');
+    await loadCategories();
+    if (currentCategoryId) await loadTasks(currentCategoryId);
+    await loadAllMonths();
+    populateExportMonthSelects();
+  } catch (err) {
+    alert('导入失败: ' + err.message);
+  }
+};
+
 init();

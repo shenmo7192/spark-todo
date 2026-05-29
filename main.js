@@ -98,6 +98,33 @@ ipcMain.handle('export:excel', async (_, targetPath) => {
   }
 });
 
+ipcMain.handle('export:excelDB', safeHandler(async (_, targetPath) => {
+  try {
+    await exporter.exportExcelDB(targetPath);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}));
+
+ipcMain.handle('import:excelDB', safeHandler(async (_, filePath) => {
+  try {
+    const data = Exporter._readImportFile(filePath);
+    const { version, schemaVersion } = Exporter.parseImportVersion(data);
+    return { data, version, schemaVersion };
+  } catch (err) {
+    throw new Error('文件读取失败: ' + err.message);
+  }
+}));
+
+ipcMain.handle('import:data', safeHandler(async (_, data, mode) => {
+  try {
+    return exporter.importExcelDBRaw(data, mode);
+  } catch (err) {
+    throw new Error('导入失败: ' + err.message);
+  }
+}));
+
 ipcMain.handle('dialog:showSaveDialog', async (_, options) => {
   const result = await dialog.showSaveDialog(mainWindow, options);
   return result;

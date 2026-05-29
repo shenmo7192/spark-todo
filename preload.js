@@ -36,6 +36,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
   // Export
   exportExcel: (targetPath) => ipcRenderer.invoke('export:excel', targetPath),
+  exportExcelDB: (targetPath) => ipcRenderer.invoke('export:excelDB', targetPath),
+  importExcelDB: (filePath) => ipcRenderer.invoke('import:excelDB', filePath),
+  importData: (data, mode) => ipcRenderer.invoke('import:data', data, mode),
 
   // Dialog
   showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),
