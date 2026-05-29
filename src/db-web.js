@@ -18,7 +18,17 @@ class IndexedDBStorage {
 
   _open() {
     return new Promise((resolve, reject) => {
+      if (!window.indexedDB) {
+        reject(new Error('浏览器不支持 IndexedDB'));
+        return;
+      }
+
       const request = indexedDB.open(DB_NAME, DB_VERSION);
+
+      request.onblocked = () => {
+        console.warn('IndexedDB 被阻塞，请关闭其他占用该数据库的标签页');
+      };
+
       request.onupgradeneeded = (event) => {
         const db = event.target.result;
         for (const [name, opts] of Object.entries(STORES)) {
@@ -35,7 +45,7 @@ class IndexedDBStorage {
         this.db = event.target.result;
         this._seedDefaultData().then(resolve).catch(resolve);
       };
-      request.onerror = () => reject(request.error);
+      request.onerror = () => reject(request.error || new Error('IndexedDB 打开失败'));
     });
   }
 

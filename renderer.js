@@ -38,14 +38,36 @@ function escapeHtml(str) {
 let globalNoteTimer = null;
 
 async function init() {
-  currentYearMonth = getNowYearMonth();
-  await loadAllMonths();
-  populateYearMonthSelects();
-  populateExportMonthSelects();
-  $('monthSelect').value = currentYearMonth.substring(5);
-  $('yearSelect').value = currentYearMonth.substring(0, 4);
-  await loadCategories();
-  await checkAllRoutineReminders();
+  try {
+    currentYearMonth = getNowYearMonth();
+    try {
+      await loadAllMonths();
+    } catch (e) {
+      console.error('loadAllMonths 失败:', e);
+      if (window.electronAPI.getVersion) {
+        alert('数据库初始化失败，请检查浏览器是否允许站点存储（IndexedDB）。\n\n错误: ' + e.message);
+      }
+    }
+    if (allMonths.length === 0) {
+      allMonths = [currentYearMonth];
+    }
+    populateYearMonthSelects();
+    populateExportMonthSelects();
+    $('monthSelect').value = currentYearMonth.substring(5);
+    $('yearSelect').value = currentYearMonth.substring(0, 4);
+    try {
+      await loadCategories();
+    } catch (e) {
+      console.error('loadCategories 失败:', e);
+    }
+    try {
+      await checkAllRoutineReminders();
+    } catch (e) {
+      console.error('checkAllRoutineReminders 失败:', e);
+    }
+  } catch (e) {
+    console.error('init 失败:', e);
+  }
 }
 
 async function loadAllMonths() {
@@ -1121,26 +1143,43 @@ function closeExportModal() {
 $('btnExport').onclick = openExportModal;
 $('btnCloseExportModal').onclick = closeExportModal;
 $('exportModalOverlay').onclick = (e) => { if (e.target === $('exportModalOverlay')) closeExportModal(); };
-$('btnChooseExportDir').onclick = async () => {
-  const result = await window.electronAPI.showOpenDialog({
-    properties: ['openDirectory']
-  });
-  if (!result.canceled && result.filePaths.length > 0) {
-    $('exportDirPath').value = result.filePaths[0];
-  }
-};
+const btnChooseExportDir = $('btnChooseExportDir');
+if (btnChooseExportDir) {
+  btnChooseExportDir.onclick = async () => {
+    const result = await window.electronAPI.showOpenDialog({
+      properties: ['openDirectory']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      $('exportDirPath').value = result.filePaths[0];
+    }
+  };
+}
 $('btnConfirmExport').onclick = async () => {
-  const dirPath = $('exportDirPath').value;
+  const dirPathEl = $('exportDirPath');
+  const dirPath = dirPathEl ? dirPathEl.value : '';
   const startMonth = $('exportStartMonth').value;
   const endMonth = $('exportEndMonth').value;
-  if (!dirPath) return alert('请选择导出目录');
-  if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
-  const res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
-  if (res.success) {
-    alert('导出成功');
-    closeExportModal();
+  const isWeb = typeof window.electronAPI.getVersion === 'function';
+  if (isWeb) {
+    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+    const prefix = dirPath || '台账';
+    const res = await window.electronAPI.exportMonthly(prefix, startMonth, endMonth);
+    if (res.success) {
+      alert(`导出成功 (${res.fileCount || 0} 个文件)`);
+      closeExportModal();
+    } else {
+      alert('导出失败: ' + (res.error || '未知错误'));
+    }
   } else {
-    alert('导出失败: ' + (res.error || '未知错误'));
+    if (!dirPath) return alert('请选择导出目录');
+    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+    const res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
+    if (res.success) {
+      alert('导出成功');
+      closeExportModal();
+    } else {
+      alert('导出失败: ' + (res.error || '未知错误'));
+    }
   }
 };
 

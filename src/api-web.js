@@ -1,8 +1,9 @@
 (function() {
-  const db = new IndexedDBStorage();
-
   const APP_VERSION = '1.1.0';
   const DB_SCHEMA_VERSION = '1';
+
+  try {
+    const db = new IndexedDBStorage();
 
   function _fmtDate(d) {
     if (!d) return '';
@@ -405,4 +406,42 @@
     getVersion: () => Promise.resolve(APP_VERSION),
     getDbSchemaVersion: () => Promise.resolve(DB_SCHEMA_VERSION)
   };
+  } catch (e) {
+    console.error('Spark Todo Web 初始化失败:', e);
+    window.electronAPI = {
+      getCategories: () => Promise.resolve([]),
+      addCategory: () => Promise.reject(new Error('存储未初始化: ' + e.message)),
+      updateCategory: () => Promise.resolve(false),
+      moveCategory: () => Promise.resolve(false),
+      deleteCategory: () => Promise.resolve(),
+      getTasks: () => Promise.resolve([]),
+      getTaskById: () => Promise.resolve(null),
+      addTask: () => Promise.reject(new Error('存储未初始化: ' + e.message)),
+      updateTask: () => Promise.resolve(),
+      deleteTask: () => Promise.resolve(),
+      getStages: () => Promise.resolve([]),
+      addStage: () => Promise.reject(new Error('存储未初始化')),
+      updateStage: () => Promise.resolve(),
+      deleteStage: () => Promise.resolve(),
+      getRoutineRecord: () => Promise.resolve(null),
+      fillRoutine: () => Promise.resolve(),
+      getLastMonthRoutine: () => Promise.resolve(null),
+      checkRoutineUnfilled: () => Promise.resolve([]),
+      getAllActiveMonths: () => Promise.resolve([]),
+      carryOverTasks: () => Promise.resolve(0),
+      getAllTasksByYear: () => Promise.resolve({}),
+      batchReorderTasks: () => Promise.resolve(),
+      changeTaskCategory: () => Promise.resolve(),
+      bulkChangeTaskCategory: () => Promise.resolve(),
+      exportExcel: () => Promise.resolve(),
+      showSaveDialog: () => Promise.resolve({ filePath: null }),
+      showOpenDialog: () => Promise.resolve({ canceled: true, filePaths: [] }),
+      exportMonthly: () => Promise.resolve({ success: false, error: '存储未初始化' }),
+      exportExcelDB: () => Promise.resolve(),
+      importExcelDB: () => Promise.reject(new Error('存储未初始化')),
+      importData: () => Promise.reject(new Error('存储未初始化')),
+      getVersion: () => Promise.resolve(APP_VERSION),
+      getDbSchemaVersion: () => Promise.resolve(DB_SCHEMA_VERSION)
+    };
+  }
 })();
