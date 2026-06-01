@@ -1,6 +1,6 @@
 {
   "name": "spark-todo",
-  "version": "1.1.0",
+  "version": "1.2.0",
   "description": "Todo 工单系统台账生成器",
   "main": "main.js",
   "scripts": {
