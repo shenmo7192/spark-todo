@@ -45,5 +45,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   showOpenDialog: (options) => ipcRenderer.invoke('dialog:showOpenDialog', options),
 
   // Export
-  exportMonthly: (dirPath, startMonth, endMonth) => ipcRenderer.invoke('export:monthlyExcel', dirPath, startMonth, endMonth)
+  exportMonthly: (dirPath, startMonth, endMonth) => ipcRenderer.invoke('export:monthlyExcel', dirPath, startMonth, endMonth),
+
+  // App info
+  getVersion: () => ipcRenderer.invoke('app:getVersion'),
+  getDbSchemaVersion: () => ipcRenderer.invoke('app:getDbSchemaVersion')
 });

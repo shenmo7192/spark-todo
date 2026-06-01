@@ -5,6 +5,20 @@ const fs = require('fs');
 const ExcelDB = require('./db');
 const Exporter = require('./export');
 
+const gotTheLock = app.requestSingleInstanceLock();
+
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', () => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.show();
+      mainWindow.focus();
+    }
+  });
+}
+
 let mainWindow;
 let tray = null;
 let db;
@@ -193,4 +207,13 @@ ipcMain.handle('export:monthlyExcel', async (_, dirPath, startMonth, endMonth) =
   } catch (err) {
     return { success: false, error: err.message };
   }
+});
+
+ipcMain.handle('app:getVersion', () => {
+  const pkg = require(path.join(__dirname, 'package.json'));
+  return pkg.version;
+});
+
+ipcMain.handle('app:getDbSchemaVersion', () => {
+  return '1';
 });
