@@ -199,15 +199,17 @@ body {
 .stage-note { font-size: 14px; word-break: break-word; white-space: pre-wrap; line-height: 1.5; }
 .stage-time { font-size: 11px; color: var(--text-secondary); margin-top: 4px; }
 .stage-check {
-  cursor: pointer; min-width: 36px; height: 36px; display: flex;
-  align-items: center; justify-content: center; border-radius: 50%;
-  border: 2px solid var(--border); transition: border-color .2s, background .2s;
+  cursor: pointer; min-width: 36px; height: 36px;
+  border-radius: 50%; border: 2px solid var(--border);
+  transition: border-color .2s, background .2s;
   position: relative; flex-shrink: 0; margin: 0 4px;
 }
 .stage-check:hover { border-color: var(--primary); }
 .stage-check.checked { background: var(--success); border-color: var(--success); }
 .stage-check-input { display: none; }
 .stage-check-mark {
+  position: absolute; top: 50%; left: 50%;
+  transform: translate(-50%, -50%);
   font-weight: 700; font-size: 15px; color: var(--text-secondary);
   line-height: 1;
 }
