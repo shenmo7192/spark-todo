@@ -307,15 +307,17 @@ class ExcelDB {
     const id = this._nextId('task');
     const now = new Date().toISOString();
     const createdAt = task.createdAt || now;
-    const allTaskRows = this._sheetToJson(SHEETS.tasks).filter(r => r[1] == task.categoryId);
+    const allTaskRows = this._sheetToJson(SHEETS.tasks);
     for (const row of allTaskRows) {
-      row[10] = (parseInt(row[10]) || 0) + 1;
+      if (row[1] == task.categoryId) {
+        row[10] = (parseInt(row[10]) || 0) + 1;
+      }
     }
-    this._replaceSheet(SHEETS.tasks, allTaskRows);
-    this._appendRows(SHEETS.tasks, [[
+    allTaskRows.push([
       id, task.categoryId, task.title, task.description || '', task.status || 'created',
       task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', '', 1
-    ]]);
+    ]);
+    this._replaceSheet(SHEETS.tasks, allTaskRows);
     this.save();
     return id;
   }

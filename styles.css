@@ -209,6 +209,7 @@ body {
 .stage-check-input { display: none; }
 .stage-check-mark {
   font-weight: 700; font-size: 15px; color: var(--text-secondary);
+  line-height: 1;
 }
 .stage-check.checked .stage-check-mark { color: #fff; }
 .btn-stage-delete {
