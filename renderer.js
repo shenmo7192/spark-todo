@@ -474,7 +474,7 @@ async function onDrop(e) {
 
   taskList.splice(srcIdx, 1);
   const newTgtIdx = taskList.findIndex(t => t.id === targetId);
-  taskList.splice(newTgtIdx + 1, 0, srcTask);
+  taskList.splice(newTgtIdx, 0, srcTask);
 
   tasks = taskList;
   renderTasks();
