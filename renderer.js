@@ -1159,23 +1159,23 @@ $('btnConfirmExport').onclick = async () => {
   const dirPath = dirPathEl ? dirPathEl.value : '';
   const startMonth = $('exportStartMonth').value;
   const endMonth = $('exportEndMonth').value;
-  const isWeb = typeof window.electronAPI.getVersion === 'function';
-  if (isWeb) {
-    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
-    const prefix = dirPath || '台账';
-    const res = await window.electronAPI.exportMonthly(prefix, startMonth, endMonth);
-    if (res.success) {
-      alert(`导出成功 (${res.fileCount || 0} 个文件)`);
-      closeExportModal();
-    } else {
-      alert('导出失败: ' + (res.error || '未知错误'));
-    }
-  } else {
+  const isElectron = typeof window.electronAPI.getVersion === 'function';
+  if (isElectron) {
     if (!dirPath) return alert('请选择导出目录');
     if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
     const res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
     if (res.success) {
       alert('导出成功');
+      closeExportModal();
+    } else {
+      alert('导出失败: ' + (res.error || '未知错误'));
+    }
+  } else {
+    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+    const prefix = dirPath || '台账';
+    const res = await window.electronAPI.exportMonthly(prefix, startMonth, endMonth);
+    if (res.success) {
+      alert(`导出成功 (${res.fileCount || 0} 个文件)`);
       closeExportModal();
     } else {
       alert('导出失败: ' + (res.error || '未知错误'));
@@ -1372,8 +1372,8 @@ function closeSettingsModal() {
 }
 
 async function loadSettingsInfo() {
-  const isWeb = typeof window.electronAPI.getVersion === 'function';
-  if (isWeb) {
+  const isElectron = typeof window.electronAPI.getVersion === 'function';
+  if (isElectron) {
     try {
       const ver = await window.electronAPI.getVersion();
       const schema = await window.electronAPI.getDbSchemaVersion();
@@ -1383,11 +1383,11 @@ async function loadSettingsInfo() {
       $('settingsVersion').textContent = '1.2.1';
       $('settingsDbSchema').textContent = '1';
     }
-    $('settingsPlatform').textContent = 'Web (浏览器)';
+    $('settingsPlatform').textContent = 'Electron';
   } else {
     $('settingsVersion').textContent = '1.2.1';
     $('settingsDbSchema').textContent = '1';
-    $('settingsPlatform').textContent = 'Electron';
+    $('settingsPlatform').textContent = 'Web (浏览器)';
   }
 }
 
@@ -1396,11 +1396,8 @@ $('btnCloseSettingsModal').onclick = closeSettingsModal;
 $('settingsModalOverlay').onclick = (e) => { if (e.target === $('settingsModalOverlay')) closeSettingsModal(); };
 
 $('btnExportDB').onclick = async () => {
-  const isWeb = typeof window.electronAPI.getVersion === 'function';
-  if (isWeb) {
-    closeSettingsModal();
-    await window.electronAPI.exportExcelDB();
-  } else {
+  const isElectron = typeof window.electronAPI.getVersion === 'function';
+  if (isElectron) {
     const result = await window.electronAPI.showSaveDialog({
       title: '导出数据备份',
       defaultPath: `SparkTodo_备份_${new Date().toISOString().substring(0, 10)}.xlsx`,
@@ -1415,12 +1412,31 @@ $('btnExportDB').onclick = async () => {
         alert('导出失败: ' + (res.error || '未知错误'));
       }
     }
+  } else {
+    closeSettingsModal();
+    await window.electronAPI.exportExcelDB();
   }
 };
 
 $('btnImportDB').onclick = async () => {
-  const isWeb = typeof window.electronAPI.getVersion === 'function';
-  if (isWeb) {
+  const isElectron = typeof window.electronAPI.getVersion === 'function';
+  if (isElectron) {
+    const result = await window.electronAPI.showOpenDialog({
+      title: '选择数据备份文件',
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
+      properties: ['openFile']
+    });
+    if (!result.canceled && result.filePaths.length > 0) {
+      closeSettingsModal();
+      try {
+        const parsed = await window.electronAPI.importExcelDB(result.filePaths[0]);
+        pendingImportData = parsed.data;
+        showImportConfirm(parsed);
+      } catch (err) {
+        alert('文件读取失败: ' + err.message);
+      }
+    }
+  } else {
     const input = document.createElement('input');
     input.type = 'file';
     input.accept = '.xlsx';
@@ -1437,22 +1453,6 @@ $('btnImportDB').onclick = async () => {
       }
     };
     input.click();
-  } else {
-    const result = await window.electronAPI.showOpenDialog({
-      title: '选择数据备份文件',
-      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }],
-      properties: ['openFile']
-    });
-    if (!result.canceled && result.filePaths.length > 0) {
-      closeSettingsModal();
-      try {
-        const parsed = await window.electronAPI.importExcelDB(result.filePaths[0]);
-        pendingImportData = parsed.data;
-        showImportConfirm(parsed);
-      } catch (err) {
-        alert('文件读取失败: ' + err.message);
-      }
-    }
   }
 };
 
