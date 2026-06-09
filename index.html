@@ -30,7 +30,6 @@
         <span id="bulkCount">已选择 0 项</span>
         <button class="btn btn-sm" id="btnBulkComplete">批量完成</button>
         <button class="btn btn-sm btn-danger" id="btnBulkDelete">批量删除</button>
-        <button class="btn btn-sm" id="btnBulkMove">批量切换分类</button>
         <button class="btn btn-sm" id="btnBulkCancel">取消</button>
       </div>
       <div class="filter-info" id="filterInfo"></div>
@@ -53,11 +52,6 @@
         <div class="form-row">
           <label>任务名称</label>
           <input type="text" id="taskTitle" class="input">
-        </div>
-
-        <div class="form-row">
-          <label>分类</label>
-          <select id="taskCategory" class="input" style="width:200px;"></select>
         </div>
         <div class="form-row">
           <label>文本描述 / 工作思路 / STAR总结</label>
@@ -202,14 +196,46 @@
       </div>
       <div class="modal-body">
         <div class="form-row">
-          <label>起始月份</label>
-          <select id="exportStartMonth" class="input"></select>
+          <label>导出模式</label>
+          <select id="exportMode" class="input">
+            <option value="monthly">按月度（分文件）</option>
+            <option value="custom">自定义范围（合并文件）</option>
+            <option value="yearly">按年度（合并文件）</option>
+            <option value="quarterly">按季度（合并文件）</option>
+          </select>
         </div>
-        <div class="form-row">
-          <label>结束月份</label>
-          <select id="exportEndMonth" class="input"></select>
+        <div id="exportYearlyOpts" style="display:none">
+          <div class="form-row">
+            <label>年份</label>
+            <select id="exportYear" class="input"></select>
+          </div>
         </div>
-        <div class="form-row">
+        <div id="exportQuarterlyOpts" style="display:none">
+          <div class="form-row">
+            <label>年份</label>
+            <select id="exportQuarterYear" class="input"></select>
+          </div>
+          <div class="form-row">
+            <label>季度</label>
+            <select id="exportQuarter" class="input">
+              <option value="1">第一季度 (1-3月)</option>
+              <option value="2">第二季度 (4-6月)</option>
+              <option value="3">第三季度 (7-9月)</option>
+              <option value="4">第四季度 (10-12月)</option>
+            </select>
+          </div>
+        </div>
+        <div id="exportRangeOpts">
+          <div class="form-row">
+            <label>起始月份</label>
+            <select id="exportStartMonth" class="input"></select>
+          </div>
+          <div class="form-row">
+            <label>结束月份</label>
+            <select id="exportEndMonth" class="input"></select>
+          </div>
+        </div>
+        <div id="exportDirOpts" class="form-row">
           <label>导出目录</label>
           <div class="path-input">
             <input type="text" id="exportDirPath" class="input" readonly placeholder="请选择导出目录">
@@ -236,26 +262,6 @@
           <select id="overviewYearSelect" class="input" style="width:120px;"></select>
         </div>
         <div class="overview-grid" id="overviewGrid"></div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Modal: Bulk Move Category -->
-  <div class="modal-overlay" id="bulkMoveModalOverlay">
-    <div class="modal modal-sm">
-      <div class="modal-header">
-        <h2>📂 切换到其他分类</h2>
-        <button class="btn-close" id="btnCloseBulkMoveModal">&times;</button>
-      </div>
-      <div class="modal-body">
-        <p id="bulkMoveText" style="margin-bottom:12px;"></p>
-        <div class="form-row">
-          <label>目标分类</label>
-          <select id="bulkMoveCategory" class="input"></select>
-        </div>
-      </div>
-      <div class="modal-footer">
-        <button class="btn btn-primary" id="btnConfirmBulkMove">确认切换</button>
       </div>
     </div>
   </div>

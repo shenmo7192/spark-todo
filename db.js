@@ -1,4 +1,4 @@
-const xlsx = require('xlsx');
+const xlsx = require('xlsx-js-style');
 const fs = require('fs');
 const path = require('path');
 
@@ -350,19 +350,29 @@ class ExcelDB {
   }
 
   changeTaskCategory(taskId, newCategoryId) {
+    const cats = this.getCategories();
+    const targetCat = cats.find(c => c.id == newCategoryId);
+    const newIsRoutine = targetCat ? targetCat.is_routine : 0;
+
     const rows = this._sheetToJson(SHEETS.tasks);
     const idx = rows.findIndex(r => r[0] == taskId);
     if (idx < 0) return;
     rows[idx][1] = newCategoryId;
+    rows[idx][6] = newIsRoutine;
     this._replaceSheet(SHEETS.tasks, rows);
     this.save();
   }
 
   bulkChangeTaskCategory(taskIds, newCategoryId) {
+    const cats = this.getCategories();
+    const targetCat = cats.find(c => c.id == newCategoryId);
+    const newIsRoutine = targetCat ? targetCat.is_routine : 0;
+
     const rows = this._sheetToJson(SHEETS.tasks);
     for (const row of rows) {
       if (taskIds.includes(row[0])) {
         row[1] = newCategoryId;
+        row[6] = newIsRoutine;
       }
     }
     this._replaceSheet(SHEETS.tasks, rows);

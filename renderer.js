@@ -101,32 +101,6 @@ function populateYearMonthSelects() {
   }
 }
 
-function populateExportMonthSelects() {
-  const startSel = $('exportStartMonth');
-  const endSel = $('exportEndMonth');
-  startSel.innerHTML = '';
-  endSel.innerHTML = '';
-  for (const ym of allMonths) {
-    const opt1 = document.createElement('option');
-    opt1.value = ym;
-    opt1.textContent = ym;
-    startSel.appendChild(opt1);
-
-    const opt2 = document.createElement('option');
-    opt2.value = ym;
-    opt2.textContent = ym;
-    endSel.appendChild(opt2);
-  }
-  if (allMonths.length > 0) {
-    if (allMonths.includes(currentYearMonth)) {
-      startSel.value = currentYearMonth;
-      endSel.value = currentYearMonth;
-    } else {
-      startSel.value = allMonths[0];
-      endSel.value = allMonths[allMonths.length - 1];
-    }
-  }
-}
 
 async function switchMonth(ym) {
   currentYearMonth = ym;
@@ -607,8 +581,6 @@ async function openTaskModal(taskId) {
   $('taskTitle').value = openedTask.title;
   $('taskDesc').value = openedTask.description || '';
 
-  populateTaskCategorySelect(openedTask.category_id);
-
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
 
@@ -684,18 +656,6 @@ function autoSaveDescription(value) {
     status: openedTask.status,
     progress: openedTask.progress
   }).catch(() => {});
-}
-
-function populateTaskCategorySelect(currentCategoryId) {
-  const sel = $('taskCategory');
-  sel.innerHTML = '';
-  for (const cat of categories) {
-    const opt = document.createElement('option');
-    opt.value = cat.id;
-    opt.textContent = cat.name;
-    if (cat.id === currentCategoryId) opt.selected = true;
-    sel.appendChild(opt);
-  }
 }
 
 async function closeTaskModal() {
@@ -1015,11 +975,6 @@ async function saveAndCloseTaskModal() {
   const title = $('taskTitle').value.trim();
   if (!title) { await closeTaskModal(); return; }
 
-  const newCategoryId = parseInt($('taskCategory').value);
-  if (newCategoryId && newCategoryId !== openedTask.category_id) {
-    await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
-  }
-
   openedTask.title = title;
   openedTask.description = $('taskDesc').value;
 
@@ -1133,9 +1088,76 @@ $('btnSaveCategory').onclick = async () => {
 };
 
 // Export modal
+function populateExportMonthSelects() {
+  const startSel = $('exportStartMonth');
+  const endSel = $('exportEndMonth');
+  const yearSel = $('exportYear');
+  const qYearSel = $('exportQuarterYear');
+
+  startSel.innerHTML = '';
+  endSel.innerHTML = '';
+  for (const ym of allMonths) {
+    const opt1 = document.createElement('option');
+    opt1.value = ym;
+    opt1.textContent = ym;
+    startSel.appendChild(opt1);
+    const opt2 = document.createElement('option');
+    opt2.value = ym;
+    opt2.textContent = ym;
+    endSel.appendChild(opt2);
+  }
+  if (allMonths.length > 0) {
+    if (allMonths.includes(currentYearMonth)) {
+      startSel.value = currentYearMonth;
+      endSel.value = currentYearMonth;
+    } else {
+      startSel.value = allMonths[0];
+      endSel.value = allMonths[allMonths.length - 1];
+    }
+  }
+
+  // Populate year selectors
+  const years = new Set();
+  for (const ym of allMonths) years.add(ym.substring(0, 4));
+  const sortedYears = Array.from(years).sort();
+  if (yearSel) {
+    yearSel.innerHTML = '';
+    for (const y of sortedYears) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y + '年';
+      yearSel.appendChild(opt);
+    }
+    if (sortedYears.length > 0) yearSel.value = currentYearMonth.substring(0, 4);
+  }
+  if (qYearSel) {
+    qYearSel.innerHTML = '';
+    for (const y of sortedYears) {
+      const opt = document.createElement('option');
+      opt.value = y;
+      opt.textContent = y + '年';
+      qYearSel.appendChild(opt);
+    }
+    if (sortedYears.length > 0) qYearSel.value = currentYearMonth.substring(0, 4);
+  }
+
+  updateExportModeUI();
+}
+
+function updateExportModeUI() {
+  const mode = $('exportMode').value;
+  $('exportYearlyOpts').style.display = mode === 'yearly' ? 'block' : 'none';
+  $('exportQuarterlyOpts').style.display = mode === 'quarterly' ? 'block' : 'none';
+  $('exportRangeOpts').style.display = (mode === 'monthly' || mode === 'custom') ? 'block' : 'none';
+  $('exportDirOpts').style.display = mode === 'monthly' ? 'block' : 'none';
+}
+
 function openExportModal() {
   $('exportModalOverlay').classList.add('show');
+  $('exportMode').value = 'monthly';
+  $('exportDirPath').value = '';
   populateExportMonthSelects();
+  updateExportModeUI();
 }
 function closeExportModal() {
   $('exportModalOverlay').classList.remove('show');
@@ -1143,6 +1165,8 @@ function closeExportModal() {
 $('btnExport').onclick = openExportModal;
 $('btnCloseExportModal').onclick = closeExportModal;
 $('exportModalOverlay').onclick = (e) => { if (e.target === $('exportModalOverlay')) closeExportModal(); };
+$('exportMode').onchange = updateExportModeUI;
+
 const btnChooseExportDir = $('btnChooseExportDir');
 if (btnChooseExportDir) {
   btnChooseExportDir.onclick = async () => {
@@ -1155,27 +1179,77 @@ if (btnChooseExportDir) {
   };
 }
 $('btnConfirmExport').onclick = async () => {
-  const dirPathEl = $('exportDirPath');
-  const dirPath = dirPathEl ? dirPathEl.value : '';
-  const startMonth = $('exportStartMonth').value;
-  const endMonth = $('exportEndMonth').value;
+  const mode = $('exportMode').value;
   const isElectron = typeof window.electronAPI.getVersion === 'function';
-  if (isElectron) {
-    if (!dirPath) return alert('请选择导出目录');
-    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
-    const res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
-    if (res.success) {
-      alert('导出成功');
-      closeExportModal();
+  let fromMonth, toMonth, defaultFileName;
+
+  if (mode === 'yearly') {
+    const year = $('exportYear').value;
+    fromMonth = `${year}-01`;
+    toMonth = `${year}-12`;
+    defaultFileName = `工单台账_${year}年度.xlsx`;
+  } else if (mode === 'quarterly') {
+    const year = $('exportQuarterYear').value;
+    const q = parseInt($('exportQuarter').value);
+    const qStart = String((q - 1) * 3 + 1).padStart(2, '0');
+    const qEnd = String((q - 1) * 3 + 3).padStart(2, '0');
+    fromMonth = `${year}-${qStart}`;
+    toMonth = `${year}-${qEnd}`;
+    defaultFileName = `工单台账_${year}年Q${q}.xlsx`;
+  } else if (mode === 'custom') {
+    fromMonth = $('exportStartMonth').value;
+    toMonth = $('exportEndMonth').value;
+    if (fromMonth > toMonth) return alert('起始月份不能大于结束月份');
+    defaultFileName = `工单台账_${fromMonth}_至_${toMonth}.xlsx`;
+  } else {
+    // monthly - per-file mode
+    const dirPath = $('exportDirPath').value;
+    const startMonth = $('exportStartMonth').value;
+    const endMonth = $('exportEndMonth').value;
+    if (isElectron) {
+      if (!dirPath) return alert('请选择导出目录');
+      if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+      const res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
+      if (res.success) {
+        alert('导出成功');
+        closeExportModal();
+      } else {
+        alert('导出失败: ' + (res.error || '未知错误'));
+      }
     } else {
-      alert('导出失败: ' + (res.error || '未知错误'));
+      if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+      const prefix = dirPath || '台账';
+      const res = await window.electronAPI.exportMonthly(prefix, startMonth, endMonth);
+      if (res.success) {
+        alert(`导出成功 (${res.fileCount || 0} 个文件)`);
+        closeExportModal();
+      } else {
+        alert('导出失败: ' + (res.error || '未知错误'));
+      }
+    }
+    return;
+  }
+
+  // Merged-file export modes (yearly, quarterly, custom)
+  if (isElectron) {
+    const result = await window.electronAPI.showSaveDialog({
+      title: '保存台账文件',
+      defaultPath: defaultFileName,
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
+    });
+    if (!result.canceled && result.filePath) {
+      const res = await window.electronAPI.exportExcel(result.filePath, fromMonth, toMonth);
+      if (res.success) {
+        alert('导出成功！');
+        closeExportModal();
+      } else {
+        alert('导出失败: ' + (res.error || '未知错误'));
+      }
     }
   } else {
-    if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
-    const prefix = dirPath || '台账';
-    const res = await window.electronAPI.exportMonthly(prefix, startMonth, endMonth);
+    const res = await window.electronAPI.exportExcel(defaultFileName, fromMonth, toMonth);
     if (res.success) {
-      alert(`导出成功 (${res.fileCount || 0} 个文件)`);
+      alert('导出成功');
       closeExportModal();
     } else {
       alert('导出失败: ' + (res.error || '未知错误'));
@@ -1232,7 +1306,6 @@ function switchMonthFromSelects() {
 // Bulk actions
 $('btnBulkComplete').onclick = handleBulkComplete;
 $('btnBulkDelete').onclick = handleBulkDelete;
-$('btnBulkMove').onclick = openBulkMoveModal;
 $('btnBulkCancel').onclick = () => {
   selectedTaskIds.clear();
   updateBulkBar();
@@ -1328,37 +1401,6 @@ async function loadOverviewData() {
   }
 }
 
-// Bulk move category modal
-function openBulkMoveModal() {
-  $('bulkMoveText').textContent = `将选中的 ${selectedTaskIds.size} 个任务切换到以下分类：`;
-  const sel = $('bulkMoveCategory');
-  sel.innerHTML = '';
-  for (const cat of categories) {
-    if (cat.id === currentCategoryId) continue;
-    const opt = document.createElement('option');
-    opt.value = cat.id;
-    opt.textContent = cat.name;
-    sel.appendChild(opt);
-  }
-  $('bulkMoveModalOverlay').classList.add('show');
-}
-
-function closeBulkMoveModal() {
-  $('bulkMoveModalOverlay').classList.remove('show');
-}
-
-$('btnCloseBulkMoveModal').onclick = closeBulkMoveModal;
-$('bulkMoveModalOverlay').onclick = (e) => { if (e.target === $('bulkMoveModalOverlay')) closeBulkMoveModal(); };
-$('btnConfirmBulkMove').onclick = async () => {
-  const newCategoryId = parseInt($('bulkMoveCategory').value);
-  if (!newCategoryId) return;
-  await window.electronAPI.bulkChangeTaskCategory([...selectedTaskIds], newCategoryId);
-  selectedTaskIds.clear();
-  updateBulkBar();
-  closeBulkMoveModal();
-  await loadTasks(currentCategoryId);
-};
-
 // Settings modal
 let pendingImportData = null;
 
@@ -1380,12 +1422,12 @@ async function loadSettingsInfo() {
       $('settingsVersion').textContent = ver;
       $('settingsDbSchema').textContent = schema;
     } catch (e) {
-      $('settingsVersion').textContent = '1.2.1';
+      $('settingsVersion').textContent = '1.3.0';
       $('settingsDbSchema').textContent = '1';
     }
     $('settingsPlatform').textContent = 'Electron';
   } else {
-    $('settingsVersion').textContent = '1.2.1';
+    $('settingsVersion').textContent = '1.3.0';
     $('settingsDbSchema').textContent = '1';
     $('settingsPlatform').textContent = 'Web (浏览器)';
   }

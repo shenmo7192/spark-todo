@@ -151,12 +151,10 @@ ipcMain.handle('db:getAllActiveMonths', safeHandler(() => db.getAllActiveMonths(
 ipcMain.handle('db:carryOverTasks', safeHandler((_, targetYearMonth, categoryId) => db.carryOverTasks(targetYearMonth, categoryId)));
 ipcMain.handle('db:getAllTasksByYear', safeHandler((_, year) => db.getAllTasksByYear(year)));
 ipcMain.handle('db:batchReorderTasks', safeHandler((_, categoryId, taskIds) => db.batchReorderTasks(categoryId, taskIds)));
-ipcMain.handle('db:changeTaskCategory', safeHandler((_, taskId, newCategoryId) => db.changeTaskCategory(taskId, newCategoryId)));
-ipcMain.handle('db:bulkChangeTaskCategory', safeHandler((_, taskIds, newCategoryId) => db.bulkChangeTaskCategory(taskIds, newCategoryId)));
 
-ipcMain.handle('export:excel', async (_, targetPath) => {
+ipcMain.handle('export:excel', async (_, targetPath, fromMonth, toMonth) => {
   try {
-    await exporter.exportToExcel(targetPath);
+    await exporter.exportToExcel(targetPath, fromMonth, toMonth);
     return { success: true };
   } catch (err) {
     return { success: false, error: err.message };
