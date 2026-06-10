@@ -352,11 +352,16 @@ class ExcelDB {
   changeTaskCategory(taskId, newCategoryId) {
     const cats = this.getCategories();
     const targetCat = cats.find(c => c.id == newCategoryId);
-    const newIsRoutine = targetCat ? targetCat.is_routine : 0;
+    if (!targetCat) return;
+    const newIsRoutine = targetCat.is_routine;
 
     const rows = this._sheetToJson(SHEETS.tasks);
     const idx = rows.findIndex(r => r[0] == taskId);
     if (idx < 0) return;
+
+    const taskIsRoutine = parseInt(rows[idx][6]) || 0;
+    if (taskIsRoutine !== newIsRoutine) return; // 禁止跨类型迁移
+
     rows[idx][1] = newCategoryId;
     rows[idx][6] = newIsRoutine;
     this._replaceSheet(SHEETS.tasks, rows);
@@ -366,11 +371,14 @@ class ExcelDB {
   bulkChangeTaskCategory(taskIds, newCategoryId) {
     const cats = this.getCategories();
     const targetCat = cats.find(c => c.id == newCategoryId);
-    const newIsRoutine = targetCat ? targetCat.is_routine : 0;
+    if (!targetCat) return;
+    const newIsRoutine = targetCat.is_routine;
 
     const rows = this._sheetToJson(SHEETS.tasks);
     for (const row of rows) {
       if (taskIds.includes(row[0])) {
+        const taskIsRoutine = parseInt(row[6]) || 0;
+        if (taskIsRoutine !== newIsRoutine) continue; // 禁止跨类型迁移
         row[1] = newCategoryId;
         row[6] = newIsRoutine;
       }

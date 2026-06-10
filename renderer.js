@@ -581,6 +581,8 @@ async function openTaskModal(taskId) {
   $('taskTitle').value = openedTask.title;
   $('taskDesc').value = openedTask.description || '';
 
+  populateTaskCategorySelect(openedTask);
+
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
 
@@ -656,6 +658,21 @@ function autoSaveDescription(value) {
     status: openedTask.status,
     progress: openedTask.progress
   }).catch(() => {});
+}
+
+function populateTaskCategorySelect(openedTask) {
+  const sel = $('taskCategory');
+  sel.innerHTML = '';
+  const taskIsRoutine = openedTask ? openedTask.is_routine : false;
+  for (const cat of categories) {
+    // Only show categories of the same type
+    if (cat.is_routine !== taskIsRoutine) continue;
+    const opt = document.createElement('option');
+    opt.value = cat.id;
+    opt.textContent = cat.name;
+    if (cat.id === openedTask.category_id) opt.selected = true;
+    sel.appendChild(opt);
+  }
 }
 
 async function closeTaskModal() {
@@ -974,6 +991,14 @@ async function saveAndCloseTaskModal() {
   if (!openedTask) { await closeTaskModal(); return; }
   const title = $('taskTitle').value.trim();
   if (!title) { await closeTaskModal(); return; }
+
+  const newCategoryId = parseInt($('taskCategory').value);
+  if (newCategoryId && newCategoryId !== openedTask.category_id) {
+    const targetCat = categories.find(c => c.id === newCategoryId);
+    if (targetCat && targetCat.is_routine === openedTask.is_routine) {
+      await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
+    }
+  }
 
   openedTask.title = title;
   openedTask.description = $('taskDesc').value;
@@ -1306,6 +1331,7 @@ function switchMonthFromSelects() {
 // Bulk actions
 $('btnBulkComplete').onclick = handleBulkComplete;
 $('btnBulkDelete').onclick = handleBulkDelete;
+$('btnBulkMove').onclick = openBulkMoveModal;
 $('btnBulkCancel').onclick = () => {
   selectedTaskIds.clear();
   updateBulkBar();
@@ -1400,6 +1426,43 @@ async function loadOverviewData() {
     grid.appendChild(card);
   }
 }
+
+// Bulk move category modal
+function openBulkMoveModal() {
+  const cat = categories.find(c => c.id === currentCategoryId);
+  const currentIsRoutine = cat ? cat.is_routine : false;
+  $('bulkMoveText').textContent = `将选中的 ${selectedTaskIds.size} 个任务迁移到以下分类（仅限同类型）：`;
+  const sel = $('bulkMoveCategory');
+  sel.innerHTML = '';
+  for (const c of categories) {
+    if (c.id === currentCategoryId) continue;
+    if (c.is_routine !== currentIsRoutine) continue;
+    const opt = document.createElement('option');
+    opt.value = c.id;
+    opt.textContent = c.name;
+    sel.appendChild(opt);
+  }
+  if (sel.options.length === 0) {
+    sel.innerHTML = '<option value="">没有可用的同类型分类</option>';
+  }
+  $('bulkMoveModalOverlay').classList.add('show');
+}
+
+function closeBulkMoveModal() {
+  $('bulkMoveModalOverlay').classList.remove('show');
+}
+
+$('btnCloseBulkMoveModal').onclick = closeBulkMoveModal;
+$('bulkMoveModalOverlay').onclick = (e) => { if (e.target === $('bulkMoveModalOverlay')) closeBulkMoveModal(); };
+$('btnConfirmBulkMove').onclick = async () => {
+  const newCategoryId = parseInt($('bulkMoveCategory').value);
+  if (!newCategoryId) return;
+  await window.electronAPI.bulkChangeTaskCategory([...selectedTaskIds], newCategoryId);
+  selectedTaskIds.clear();
+  updateBulkBar();
+  closeBulkMoveModal();
+  await loadTasks(currentCategoryId);
+};
 
 // Settings modal
 let pendingImportData = null;

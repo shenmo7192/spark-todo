@@ -31,6 +31,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   carryOverTasks: (targetYearMonth, categoryId) => ipcRenderer.invoke('db:carryOverTasks', targetYearMonth, categoryId),
   getAllTasksByYear: (year) => ipcRenderer.invoke('db:getAllTasksByYear', year),
   batchReorderTasks: (categoryId, taskIds) => ipcRenderer.invoke('db:batchReorderTasks', categoryId, taskIds),
+  changeTaskCategory: (taskId, newCategoryId) => ipcRenderer.invoke('db:changeTaskCategory', taskId, newCategoryId),
+  bulkChangeTaskCategory: (taskIds, newCategoryId) => ipcRenderer.invoke('db:bulkChangeTaskCategory', taskIds, newCategoryId),
 
   // Export
   exportExcel: (targetPath, fromMonth, toMonth) => ipcRenderer.invoke('export:excel', targetPath, fromMonth, toMonth),
