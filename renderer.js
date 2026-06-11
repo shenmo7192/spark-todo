@@ -1485,12 +1485,12 @@ async function loadSettingsInfo() {
       $('settingsVersion').textContent = ver;
       $('settingsDbSchema').textContent = schema;
     } catch (e) {
-      $('settingsVersion').textContent = '1.3.0';
+      $('settingsVersion').textContent = '1.3.2';
       $('settingsDbSchema').textContent = '1';
     }
     $('settingsPlatform').textContent = 'Electron';
   } else {
-    $('settingsVersion').textContent = '1.3.0';
+    $('settingsVersion').textContent = '1.3.2';
     $('settingsDbSchema').textContent = '1';
     $('settingsPlatform').textContent = 'Web (浏览器)';
   }
