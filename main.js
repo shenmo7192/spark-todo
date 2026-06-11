@@ -125,9 +125,14 @@ function safeHandler(fn) {
   };
 }
 
-ipcMain.handle('db:getCategories', safeHandler(() => db.getCategories()));
-ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine) => db.addCategory(name, isRoutine)));
-ipcMain.handle('db:updateCategory', safeHandler((_, id, name, isRoutine) => db.updateCategory(id, name, isRoutine)));
+ipcMain.handle('db:getTopics', safeHandler(() => db.getTopics()));
+ipcMain.handle('db:addTopic', safeHandler((_, name) => db.addTopic(name)));
+ipcMain.handle('db:updateTopic', safeHandler((_, id, name) => db.updateTopic(id, name)));
+ipcMain.handle('db:deleteTopic', safeHandler((_, id) => db.deleteTopic(id)));
+
+ipcMain.handle('db:getCategories', safeHandler((_, topicId) => db.getCategories(topicId)));
+ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine, topicId) => db.addCategory(name, isRoutine, topicId)));
+ipcMain.handle('db:updateCategory', safeHandler((_, id, name, isRoutine, topicId) => db.updateCategory(id, name, isRoutine, topicId)));
 ipcMain.handle('db:moveCategory', safeHandler((_, id, direction) => db.moveCategory(id, direction)));
 ipcMain.handle('db:deleteCategory', safeHandler((_, id) => db.deleteCategory(id)));
 
@@ -153,6 +158,9 @@ ipcMain.handle('db:getAllTasksByYear', safeHandler((_, year) => db.getAllTasksBy
 ipcMain.handle('db:batchReorderTasks', safeHandler((_, categoryId, taskIds) => db.batchReorderTasks(categoryId, taskIds)));
 ipcMain.handle('db:changeTaskCategory', safeHandler((_, taskId, newCategoryId) => db.changeTaskCategory(taskId, newCategoryId)));
 ipcMain.handle('db:bulkChangeTaskCategory', safeHandler((_, taskIds, newCategoryId) => db.bulkChangeTaskCategory(taskIds, newCategoryId)));
+
+ipcMain.handle('db:getSetting', safeHandler((_, key) => db.getSetting(key)));
+ipcMain.handle('db:setSetting', safeHandler((_, key, value) => db.setSetting(key, value)));
 
 ipcMain.handle('export:excel', async (_, targetPath, fromMonth, toMonth) => {
   try {
@@ -208,6 +216,16 @@ ipcMain.handle('export:monthlyExcel', async (_, dirPath, startMonth, endMonth) =
     return { success: false, error: err.message };
   }
 });
+
+ipcMain.handle('export:kanban', safeHandler(async (_, targetPath, fromMonth, toMonth) => {
+  try {
+    const personInCharge = db.getSetting('person_in_charge') || '';
+    await exporter.exportKanban(targetPath, fromMonth, toMonth, personInCharge);
+    return { success: true };
+  } catch (err) {
+    return { success: false, error: err.message };
+  }
+}));
 
 ipcMain.handle('app:getVersion', () => {
   const pkg = require(path.join(__dirname, 'package.json'));

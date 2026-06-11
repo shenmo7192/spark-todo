@@ -36,6 +36,33 @@ body {
   border: 1px solid var(--border);
 }
 
+.topic-bar {
+  display: flex; gap: 4px; margin-bottom: 8px;
+  border-bottom: 2px solid var(--border); padding-bottom: 2px; flex-wrap: wrap;
+}
+.topic-bar .topic {
+  padding: 8px 16px; border: none; background: transparent;
+  cursor: pointer; font-size: 14px; color: var(--text-secondary);
+  border-radius: 6px 6px 0 0; position: relative; transition: background .15s, color .15s;
+  font-weight: 500;
+}
+.topic-bar .topic:hover { background: #e5e7eb; color: var(--text); }
+.topic-bar .topic.active { color: var(--primary); font-weight: 600; }
+.topic-bar .topic.active::after {
+  content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
+  height: 3px; background: var(--primary);
+}
+.topic-add { font-weight: 700; color: var(--primary); }
+.topic-wrap { display: flex; align-items: center; position: relative; }
+.topic-wrap .topic-delete {
+  display: none; position: absolute; right: 2px; top: 2px;
+  width: 16px; height: 16px; align-items: center; justify-content: center;
+  background: var(--danger); color: #fff; border: none; border-radius: 50%;
+  font-size: 10px; cursor: pointer; z-index: 2;
+}
+.topic-wrap:hover .topic-delete { display: flex; }
+.topic-wrap .topic { padding-right: 40px; }
+
 .tab-bar {
   display: flex; gap: 4px; margin-bottom: 12px;
   border-bottom: 2px solid var(--border); padding-bottom: 2px; flex-wrap: wrap;
@@ -398,3 +425,19 @@ body {
 .btn-settings-action:hover { background: #e5e7eb; border-color: var(--primary); }
 .about-info { font-size: 13px; color: var(--text-secondary); line-height: 1.8; }
 .about-info p { margin-bottom: 2px; }
+
+/* Star rating */
+.star-rating {
+  display: flex; gap: 2px; cursor: pointer; user-select: none;
+}
+.star-rating .star {
+  font-size: 22px; color: #d1d5db; transition: color .15s, transform .15s;
+}
+.star-rating .star:hover { transform: scale(1.15); }
+.star-rating .star.active { color: #f59e0b; }
+
+/* Extra fields grid */
+.extra-fields-grid {
+  display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 12px;
+}
+.extra-fields-grid .form-row { margin-bottom: 0; }

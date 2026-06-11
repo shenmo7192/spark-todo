@@ -1,10 +1,16 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
+  // Topics
+  getTopics: () => ipcRenderer.invoke('db:getTopics'),
+  addTopic: (name) => ipcRenderer.invoke('db:addTopic', name),
+  updateTopic: (id, name) => ipcRenderer.invoke('db:updateTopic', id, name),
+  deleteTopic: (id) => ipcRenderer.invoke('db:deleteTopic', id),
+
   // Categories
-  getCategories: () => ipcRenderer.invoke('db:getCategories'),
-  addCategory: (name, isRoutine) => ipcRenderer.invoke('db:addCategory', name, isRoutine),
-  updateCategory: (id, name, isRoutine) => ipcRenderer.invoke('db:updateCategory', id, name, isRoutine),
+  getCategories: (topicId) => ipcRenderer.invoke('db:getCategories', topicId),
+  addCategory: (name, isRoutine, topicId) => ipcRenderer.invoke('db:addCategory', name, isRoutine, topicId),
+  updateCategory: (id, name, isRoutine, topicId) => ipcRenderer.invoke('db:updateCategory', id, name, isRoutine, topicId),
   moveCategory: (id, direction) => ipcRenderer.invoke('db:moveCategory', id, direction),
   deleteCategory: (id) => ipcRenderer.invoke('db:deleteCategory', id),
 
@@ -34,11 +40,16 @@ contextBridge.exposeInMainWorld('electronAPI', {
   changeTaskCategory: (taskId, newCategoryId) => ipcRenderer.invoke('db:changeTaskCategory', taskId, newCategoryId),
   bulkChangeTaskCategory: (taskIds, newCategoryId) => ipcRenderer.invoke('db:bulkChangeTaskCategory', taskIds, newCategoryId),
 
+  // Settings
+  getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),
+  setSetting: (key, value) => ipcRenderer.invoke('db:setSetting', key, value),
+
   // Export
   exportExcel: (targetPath, fromMonth, toMonth) => ipcRenderer.invoke('export:excel', targetPath, fromMonth, toMonth),
   exportExcelDB: (targetPath) => ipcRenderer.invoke('export:excelDB', targetPath),
   importExcelDB: (filePath) => ipcRenderer.invoke('import:excelDB', filePath),
   importData: (data, mode) => ipcRenderer.invoke('import:data', data, mode),
+  exportKanban: (targetPath, fromMonth, toMonth) => ipcRenderer.invoke('export:kanban', targetPath, fromMonth, toMonth),
 
   // Dialog
   showSaveDialog: (options) => ipcRenderer.invoke('dialog:showSaveDialog', options),

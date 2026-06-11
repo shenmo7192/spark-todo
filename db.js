@@ -4,6 +4,7 @@ const path = require('path');
 
 const SHEETS = {
   meta: 'meta',
+  topics: 'topics',
   categories: 'categories',
   tasks: 'tasks',
   stages: 'stages',
@@ -13,8 +14,9 @@ const SHEETS = {
 
 const HEADERS = {
   meta: ['key', 'value'],
-  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at'],
-  tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order'],
+  topics: ['id', 'name', 'sort_order', 'created_at'],
+  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'],
+  tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'],
   stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
   routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'],
   carry_overs: ['task_id', 'year_month', 'carried_at']
@@ -39,16 +41,25 @@ class ExcelDB {
       }
       this._migrateTaskSortOrder();
       this._migrateStageCompleted();
+      this._migrateTopics();
+      this._migrateTaskFields();
     } else {
       this.workbook = xlsx.utils.book_new();
       for (const name of Object.values(SHEETS)) {
         const ws = xlsx.utils.aoa_to_sheet([HEADERS[name]]);
         xlsx.utils.book_append_sheet(this.workbook, ws, name);
       }
+      // Seed default topics
+      this._appendRows(SHEETS.topics, [
+        [1, '专项任务', 0, new Date().toISOString()],
+        [2, '临时任务', 1, new Date().toISOString()],
+        [3, '日常工作', 2, new Date().toISOString()]
+      ]);
+      this._setMeta('last_topic_id', 3);
       // Seed default categories
       this._appendRows(SHEETS.categories, [
-        [1, '工作任务', 0, 0, new Date().toISOString()],
-        [2, '日常工作', 1, 1, new Date().toISOString()]
+        [1, '工作任务', 0, 0, new Date().toISOString(), 1],
+        [2, '日常工作', 1, 1, new Date().toISOString(), 3]
       ]);
       this._setMeta('last_category_id', 2);
       this._setMeta('last_task_id', 0);
@@ -56,6 +67,79 @@ class ExcelDB {
       this._setMeta('last_routine_id', 0);
       this.save();
     }
+  }
+
+  _migrateTopics() {
+    const ws = this._getSheet(SHEETS.categories);
+    if (!ws) return;
+    const catData = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (catData.length < 2) return;
+
+    // Check if categories already have topic_id column
+    const catHeaderLen = catData[0].length;
+    if (catHeaderLen >= HEADERS.categories.length) return;
+
+    // Ensure topics sheet exists with defaults
+    const topicsWs = this._getSheet(SHEETS.topics);
+    const topicsData = topicsWs
+      ? xlsx.utils.sheet_to_json(topicsWs, { header: 1, defval: '' })
+      : [];
+
+    let firstTopicId;
+    if (topicsData.length < 2) {
+      // No topics yet, create defaults
+      const now = new Date().toISOString();
+      const defaultTopics = [
+        [1, '专项任务', 0, now],
+        [2, '临时任务', 1, now],
+        [3, '日常工作', 2, now]
+      ];
+      this._replaceSheet(SHEETS.topics, defaultTopics);
+      this._setMeta('last_topic_id', 3);
+      firstTopicId = 1;
+    } else {
+      firstTopicId = parseInt(topicsData[1][0]) || 1;
+    }
+
+    // Patch categories: extend each row with topic_id = first topic
+    const patchedCats = [];
+    for (let i = 0; i < catData.length; i++) {
+      const row = [...catData[i]];
+      while (row.length < HEADERS.categories.length) row.push('');
+      if (i > 0) {
+        // Assign old categories to the first topic
+        row[5] = firstTopicId;
+      }
+      patchedCats.push(row);
+    }
+    const newWs = xlsx.utils.aoa_to_sheet(patchedCats);
+    this.workbook.Sheets[SHEETS.categories] = newWs;
+    this.save();
+  }
+
+  _migrateTaskFields() {
+    const ws = this._getSheet(SHEETS.tasks);
+    if (!ws) return;
+    const data = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (data.length < 2) return;
+    const headerLen = data[0].length;
+    if (headerLen >= HEADERS.tasks.length) return;
+
+    // Extend tasks to have importance (default 1), manual_duration, contact_person
+    const patched = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = [...data[i]];
+      while (row.length < HEADERS.tasks.length) row.push('');
+      if (i > 0) {
+        row[11] = 1; // importance default
+        row[12] = ''; // manual_duration
+        row[13] = ''; // contact_person
+      }
+      patched.push(row);
+    }
+    const newWs = xlsx.utils.aoa_to_sheet(patched);
+    this.workbook.Sheets[SHEETS.tasks] = newWs;
+    this.save();
   }
 
   _migrateTaskSortOrder() {
@@ -161,6 +245,15 @@ class ExcelDB {
     this._replaceSheet(SHEETS.meta, rows);
   }
 
+  getSetting(key) {
+    return this._getMeta(key);
+  }
+
+  setSetting(key, value) {
+    this._setMeta(key, value);
+    this.save();
+  }
+
   _nextId(type) {
     const key = `last_${type}_id`;
     let id = parseInt(this._getMeta(key) || '0', 10);
@@ -169,29 +262,79 @@ class ExcelDB {
     return id;
   }
 
-  // Categories
-  getCategories() {
-    return this._sheetToJson(SHEETS.categories).map(r => ({
-      id: r[0], name: r[1], is_routine: r[2], sort_order: r[3], created_at: r[4]
+  // Topics
+  getTopics() {
+    return this._sheetToJson(SHEETS.topics).map(r => ({
+      id: r[0], name: r[1], sort_order: r[2] || 0, created_at: r[3]
     })).sort((a, b) => a.sort_order - b.sort_order);
   }
 
-  addCategory(name, isRoutine) {
-    const cats = this.getCategories();
-    const maxOrder = cats.length ? Math.max(...cats.map(c => c.sort_order)) : -1;
-    const id = this._nextId('category');
-    this._appendRows(SHEETS.categories, [[id, name, isRoutine ? 1 : 0, maxOrder + 1, new Date().toISOString()]]);
+  addTopic(name) {
+    const topics = this.getTopics();
+    const maxOrder = topics.length ? Math.max(...topics.map(t => t.sort_order)) : -1;
+    const id = this._nextId('topic');
+    this._appendRows(SHEETS.topics, [[id, name, maxOrder + 1, new Date().toISOString()]]);
     this.save();
     return id;
   }
 
-  updateCategory(id, name, isRoutine) {
+  updateTopic(id, name) {
+    const topics = this.getTopics();
+    const idx = topics.findIndex(t => t.id === id);
+    if (idx < 0) return false;
+    topics[idx].name = name;
+    this._replaceSheet(SHEETS.topics, topics.map(t => [t.id, t.name, t.sort_order, t.created_at]));
+    this.save();
+    return true;
+  }
+
+  deleteTopic(id) {
+    const topics = this.getTopics();
+    if (topics.length <= 1) throw new Error('至少保留一个专题');
+    const deletedTopic = topics.find(t => t.id === id);
+    const remaining = topics.filter(t => t.id !== id);
+    // Move categories from deleted topic to the first remaining topic
+    const firstRemainingId = remaining[0].id;
+    const cats = this.getCategories();
+    const updatedCats = cats.map(c => {
+      if (c.topic_id === id) c.topic_id = firstRemainingId;
+      return c;
+    });
+    this._replaceSheet(SHEETS.categories, updatedCats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id]));
+    this._replaceSheet(SHEETS.topics, remaining.map(t => [t.id, t.name, t.sort_order, t.created_at]));
+    this.save();
+  }
+
+  // Categories
+  getCategories(topicId) {
+    const topics = this.getTopics();
+    const firstTopicId = topics.length > 0 ? topics[0].id : null;
+    let all = this._sheetToJson(SHEETS.categories).map(r => ({
+      id: r[0], name: r[1], is_routine: r[2], sort_order: r[3], created_at: r[4], topic_id: r[5] || firstTopicId
+    }));
+    if (topicId !== undefined && topicId !== null) {
+      all = all.filter(c => c.topic_id == topicId);
+    }
+    return all.sort((a, b) => a.sort_order - b.sort_order);
+  }
+
+  addCategory(name, isRoutine, topicId) {
+    const cats = this.getCategories();
+    const maxOrder = cats.length ? Math.max(...cats.map(c => c.sort_order)) : -1;
+    const id = this._nextId('category');
+    this._appendRows(SHEETS.categories, [[id, name, isRoutine ? 1 : 0, maxOrder + 1, new Date().toISOString(), topicId]]);
+    this.save();
+    return id;
+  }
+
+  updateCategory(id, name, isRoutine, topicId) {
     const cats = this.getCategories();
     const idx = cats.findIndex(c => c.id === id);
     if (idx < 0) return false;
     cats[idx].name = name;
     if (isRoutine !== undefined) cats[idx].is_routine = isRoutine ? 1 : 0;
-    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at]));
+    if (topicId !== undefined) cats[idx].topic_id = topicId;
+    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id]));
     this.save();
     return true;
   }
@@ -205,7 +348,7 @@ class ExcelDB {
     const tmp = cats[idx].sort_order;
     cats[idx].sort_order = cats[targetIdx].sort_order;
     cats[targetIdx].sort_order = tmp;
-    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at]));
+    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id]));
     this.save();
     return true;
   }
@@ -228,14 +371,15 @@ class ExcelDB {
     this._replaceSheet(SHEETS.tasks, tasks);
 
     const cats = this.getCategories().filter(c => c.id !== id);
-    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at]));
+    this._replaceSheet(SHEETS.categories, cats.map(c => [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id]));
     this.save();
   }
 
   getTaskById(taskId) {
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10],
+      importance: parseInt(r[11]) || 1, manual_duration: r[12] || '', contact_person: r[13] || ''
     }));
     const task = allTasks.find(t => t.id == taskId);
     if (!task) return null;
@@ -253,7 +397,8 @@ class ExcelDB {
   getTasks(categoryId, yearMonth) {
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10],
+      importance: parseInt(r[11]) || 1, manual_duration: r[12] || '', contact_person: r[13] || ''
     }));
     const tasks = allTasks.filter(t => t.category_id == categoryId);
     const carried = this.getCarriedTasks(categoryId, yearMonth);
@@ -315,7 +460,8 @@ class ExcelDB {
     }
     allTaskRows.push([
       id, task.categoryId, task.title, task.description || '', task.status || 'created',
-      task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', '', 1
+      task.progress || 0, task.isRoutine ? 1 : 0, createdAt, '', '', 1,
+      task.importance || 1, task.manual_duration || '', task.contact_person || ''
     ]);
     this._replaceSheet(SHEETS.tasks, allTaskRows);
     this.save();
@@ -344,7 +490,11 @@ class ExcelDB {
       completed = '';
     }
 
-    rows[idx] = [task.id, existing[1], task.title, task.description || '', task.status, progress, existing[6], existing[7], started, completed, existing[10]];
+    rows[idx] = [task.id, existing[1], task.title, task.description || '', task.status, progress, existing[6], existing[7], started, completed, existing[10],
+      task.importance !== undefined ? task.importance : (existing[11] || 1),
+      task.manual_duration !== undefined ? task.manual_duration : (existing[12] || ''),
+      task.contact_person !== undefined ? task.contact_person : (existing[13] || '')
+    ];
     this._replaceSheet(SHEETS.tasks, rows);
     this.save();
   }
@@ -536,11 +686,16 @@ class ExcelDB {
   getExportData() {
     const tasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10],
+      importance: parseInt(r[11]) || 1, manual_duration: r[12] || '', contact_person: r[13] || ''
     }));
     const cats = this.getCategories();
+    const topcs = this.getTopics();
     for (const task of tasks) {
       task.category = cats.find(c => c.id == task.category_id);
+      if (task.category) {
+        task.topic = topcs.find(t => t.id == task.category.topic_id);
+      }
       if (task.is_routine) {
         task.records = this._sheetToJson(SHEETS.routine_records)
           .filter(r => r[1] == task.id)
@@ -645,7 +800,8 @@ class ExcelDB {
     const cats = this.getCategories();
     const allTasks = this._sheetToJson(SHEETS.tasks).map(r => ({
       id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],
-      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10]
+      progress: r[5], is_routine: r[6], created_at: r[7], started_at: r[8], completed_at: r[9], sort_order: r[10],
+      importance: parseInt(r[11]) || 1, manual_duration: r[12] || '', contact_person: r[13] || ''
     }));
 
     const result = {};

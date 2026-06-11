@@ -14,10 +14,16 @@
         <select class="month-select" id="yearSelect"></select>
         <select class="month-select" id="monthSelect"></select>
         <button class="btn btn-export" id="btnExport">📥 导出Excel台账</button>
+        <button class="btn btn-export" id="btnKanban">📋 导出看板数据</button>
         <button class="btn btn-export" id="btnOverview">📊 任务总览</button>
         <button class="btn btn-settings" id="btnSettings" title="设置">⚙️</button>
       </div>
     </header>
+
+    <div class="topic-bar" id="topicBar">
+      <!-- Topic tabs injected by JS -->
+      <button class="topic topic-add" id="btnAddTopic" title="添加专题">+</button>
+    </div>
 
     <div class="tab-bar" id="tabBar">
       <!-- Tabs injected by JS -->
@@ -61,6 +67,28 @@
         <div class="form-row">
           <label>文本描述 / 工作思路 / STAR总结</label>
           <textarea id="taskDesc" class="textarea" rows="4" placeholder="记录任务开展的想法、可求助的资源，或用STAR原则写总结..."></textarea>
+        </div>
+
+        <div class="form-row" id="extraFieldsRow">
+          <div class="extra-fields-grid">
+            <div class="form-row">
+              <label>重要性</label>
+              <div class="star-rating" id="starRating">
+                <span class="star" data-val="0" title="未评级">☆</span>
+                <span class="star" data-val="1" title="低">★</span>
+                <span class="star" data-val="2" title="中">★</span>
+                <span class="star" data-val="3" title="高">★</span>
+              </div>
+            </div>
+            <div class="form-row">
+              <label>时长（手动填写）</label>
+              <input type="text" id="taskManualDuration" class="input" placeholder="如: 3天 / 2周">
+            </div>
+            <div class="form-row">
+              <label>对接人</label>
+              <input type="text" id="taskContactPerson" class="input" placeholder="对接人姓名">
+            </div>
+          </div>
         </div>
 
         <div class="form-row" id="routinePanel" style="display:none;">
@@ -132,6 +160,10 @@
           <input type="text" id="catName" class="input">
         </div>
         <div class="form-row">
+          <label>所属专题</label>
+          <select id="catTopic" class="input"></select>
+        </div>
+        <div class="form-row">
           <label>
             <input type="checkbox" id="catIsRoutine"> 日常工作 (每月自动刷新)
           </label>
@@ -139,6 +171,45 @@
       </div>
       <div class="modal-footer">
         <button class="btn btn-primary" id="btnSaveCategory">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Topic -->
+  <div class="modal-overlay" id="topicModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2 id="topicModalTitle">添加专题</h2>
+        <button class="btn-close" id="btnCloseTopicModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>专题名称</label>
+          <input type="text" id="topicName" class="input">
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnSaveTopic">保存</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Move Category Topic -->
+  <div class="modal-overlay" id="moveCatTopicModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>切换分类所属专题</h2>
+        <button class="btn-close" id="btnCloseMoveCatTopicModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <p id="moveCatTopicText" style="margin-bottom:12px;"></p>
+        <div class="form-row">
+          <label>目标专题</label>
+          <select id="moveCatTopicSelect" class="input"></select>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnConfirmMoveCatTopic">确认切换</button>
       </div>
     </div>
   </div>
@@ -254,6 +325,57 @@
     </div>
   </div>
 
+  <!-- Modal: Kanban Export -->
+  <div class="modal-overlay" id="kanbanModalOverlay">
+    <div class="modal modal-sm">
+      <div class="modal-header">
+        <h2>导出看板数据</h2>
+        <button class="btn-close" id="btnCloseKanbanModal">&times;</button>
+      </div>
+      <div class="modal-body">
+        <div class="form-row">
+          <label>导出模式</label>
+          <select id="kanbanExportMode" class="input">
+            <option value="all">全部数据</option>
+            <option value="yearly">按年度</option>
+            <option value="quarterly">按季度</option>
+            <option value="monthly">按月</option>
+          </select>
+        </div>
+        <div id="kanbanYearlyOpts" style="display:none">
+          <div class="form-row">
+            <label>年份</label>
+            <select id="kanbanYear" class="input"></select>
+          </div>
+        </div>
+        <div id="kanbanQuarterlyOpts" style="display:none">
+          <div class="form-row">
+            <label>年份</label>
+            <select id="kanbanQuarterYear" class="input"></select>
+          </div>
+          <div class="form-row">
+            <label>季度</label>
+            <select id="kanbanQuarter" class="input">
+              <option value="1">第一季度 (1-3月)</option>
+              <option value="2">第二季度 (4-6月)</option>
+              <option value="3">第三季度 (7-9月)</option>
+              <option value="4">第四季度 (10-12月)</option>
+            </select>
+          </div>
+        </div>
+        <div id="kanbanMonthlyOpts" style="display:none">
+          <div class="form-row">
+            <label>月份</label>
+            <select id="kanbanMonth" class="input"></select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer">
+        <button class="btn btn-primary" id="btnConfirmKanbanExport">导出</button>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Task Overview -->
   <div class="modal-overlay" id="overviewModalOverlay">
     <div class="modal modal-wide">
@@ -316,6 +438,14 @@
         <button class="btn-close" id="btnCloseSettingsModal">&times;</button>
       </div>
       <div class="modal-body">
+        <div class="settings-section">
+          <h3>👤 用户配置</h3>
+          <div class="form-row">
+            <label>负责人名称（导出看板用）</label>
+            <input type="text" id="settingsPersonInCharge" class="input" placeholder="填写负责人姓名">
+            <button class="btn btn-primary" id="btnSavePersonInCharge" style="margin-top:8px;">保存</button>
+          </div>
+        </div>
         <div class="settings-section">
           <h3>💾 数据管理</h3>
           <div class="settings-actions">

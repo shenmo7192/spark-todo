@@ -2,7 +2,7 @@ const xlsx = require('xlsx-js-style');
 const path = require('path');
 const fs = require('fs');
 
-const COL_COUNT = 11;
+const COL_COUNT = 12;
 
 class Exporter {
   constructor(db) {
@@ -49,7 +49,7 @@ class Exporter {
 
   _headerRow() {
     return [
-      '分类', '任务名称', '文本描述', '第几段', '阶段备注（更新内容）',
+      '专题', '分类', '任务名称', '文本描述', '第几段', '阶段备注（更新内容）',
       '接收时间', '开始时间', '更新时间', '结束时间',
       '完成度', '状态'
     ];
@@ -57,7 +57,7 @@ class Exporter {
 
   _columnWidths() {
     return [
-      { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 35 },
+      { wch: 10 }, { wch: 10 }, { wch: 20 }, { wch: 30 }, { wch: 12 }, { wch: 35 },
       { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 18 }, { wch: 10 },
       { wch: 10 }
     ];
@@ -262,12 +262,12 @@ class Exporter {
         const block = allBlocks[bi];
         // Separator row between months
         if (bi > 0) {
-          const sepRow = [`── ${block.ym} ──`, '', '', '', '', '', '', '', '', '', ''];
+          const sepRow = [`── ${block.ym} ──`, '', '', '', '', '', '', '', '', '', '', ''];
           mergedRows.push(sepRow);
           mergedMetas.push(null);
         } else {
           // First block: add its ym as a sub-label
-          const labelRow = [`── ${block.ym} ──`, '', '', '', '', '', '', '', '', '', ''];
+          const labelRow = [`── ${block.ym} ──`, '', '', '', '', '', '', '', '', '', '', ''];
           mergedRows.push(labelRow);
           mergedMetas.push(null);
         }
@@ -313,6 +313,7 @@ class Exporter {
     const rec = (task.records || []).find(r => r.year_month === ym);
     if (rec) {
       rows.push([
+        task.topic?.name || '',
         task.category?.name || '',
         task.title,
         task.description || '',
@@ -339,6 +340,7 @@ class Exporter {
       const createYm = task.created_at ? task.created_at.substring(0, 7) : null;
       if (createYm === ym) {
         rows.push([
+          task.topic?.name || '',
           task.category?.name || '',
           task.title,
           task.description || '',
@@ -409,6 +411,11 @@ class Exporter {
   async exportMonthly(dirPath, startMonth, endMonth) {
     if (!fs.existsSync(dirPath)) fs.mkdirSync(dirPath, { recursive: true });
     const cats = this.db.getCategories();
+    const topcs = this.db.getTopics();
+    const topicMap = {};
+    for (const t of topcs) topicMap[t.id] = t.name;
+    const catTopicMap = {};
+    for (const c of cats) catTopicMap[c.id] = topicMap[c.topic_id] || '';
 
     let ym = startMonth;
     while (ym <= endMonth) {
@@ -419,12 +426,14 @@ class Exporter {
       for (const cat of cats) {
         const rows = [this._headerRow()];
         const rowMetas = [null];
+        const topicName = catTopicMap[cat.id] || '';
 
         const tasks = this.db.getTasks(cat.id, ym);
         for (const task of tasks) {
           if (task.is_routine) {
             if (task.routineRecord) {
               rows.push([
+                topicName,
                 cat.name,
                 task.title,
                 task.description || '',
@@ -445,6 +454,7 @@ class Exporter {
 
             if (stages.length === 0) {
               rows.push([
+                topicName,
                 cat.name,
                 task.title,
                 task.description || '',
@@ -486,6 +496,7 @@ class Exporter {
                 const progress = this._stageProgress(i + 1, totalStages);
 
                 rows.push([
+                  topicName,
                   cat.name,
                   task.title,
                   task.description || '',
@@ -520,7 +531,7 @@ class Exporter {
 
         for (let bi = 0; bi < allBlocks.length; bi++) {
           const block = allBlocks[bi];
-          const sepRow = [`── ${block.label} ──`, '', '', '', '', '', '', '', '', '', ''];
+          const sepRow = [`── ${block.label} ──`, '', '', '', '', '', '', '', '', '', '', ''];
           mergedRows.push(sepRow);
           mergedMetas.push(null);
 
@@ -556,7 +567,7 @@ class Exporter {
     const metaSheet = wb.Sheets['meta'];
     if (metaSheet) result.meta = xlsx.utils.sheet_to_json(metaSheet);
     else result.meta = [];
-    const sheetNames = ['categories', 'tasks', 'stages', 'routine_records', 'carry_overs'];
+    const sheetNames = ['topics', 'categories', 'tasks', 'stages', 'routine_records', 'carry_overs'];
     for (const name of sheetNames) {
       const sheet = wb.Sheets[name];
       result[name] = sheet ? xlsx.utils.sheet_to_json(sheet) : [];
@@ -581,6 +592,7 @@ class Exporter {
     const DB_SCHEMA_VERSION = '1';
 
     const allCategories = this.db._sheetToJson('categories');
+    const allTopics = this.db._sheetToJson('topics');
     const allTasks = this.db._sheetToJson('tasks');
     const allStages = this.db._sheetToJson('stages');
     const allRoutines = this.db._sheetToJson('routine_records');
@@ -600,8 +612,9 @@ class Exporter {
     xlsx.utils.book_append_sheet(wb, wsMeta, 'meta');
 
     const arraySheets = [
-      { name: 'categories', headers: ['id', 'name', 'is_routine', 'sort_order', 'created_at'], data: allCategories },
-      { name: 'tasks', headers: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order'], data: allTasks },
+      { name: 'topics', headers: ['id', 'name', 'sort_order', 'created_at'], data: allTopics },
+      { name: 'categories', headers: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'], data: allCategories },
+      { name: 'tasks', headers: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'], data: allTasks },
       { name: 'stages', headers: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'], data: allStages },
       { name: 'routine_records', headers: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'], data: allRoutines }
     ];
@@ -628,11 +641,20 @@ class Exporter {
     }
 
     if (mode === 'replace') {
+      // Handle topics first
+      if (data['topics'] && data['topics'].length > 0) {
+        const topicHeaders = ['id', 'name', 'sort_order', 'created_at'];
+        const rows = data['topics'].map(row => topicHeaders.map(h => row[h] !== undefined ? row[h] : ''));
+        this.db._replaceSheet('topics', rows);
+      } else {
+        this.db._replaceSheet('topics', []);
+      }
+
       for (const name of ['categories', 'tasks', 'stages', 'routine_records', 'carry_overs']) {
         const sheetName = name;
         const headers = {
-          categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at'],
-          tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order'],
+          categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'],
+          tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'],
           stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
           routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'],
           carry_overs: ['task_id', 'year_month', 'carried_at']
@@ -650,6 +672,17 @@ class Exporter {
       const cleanMeta = (data.meta || []).filter(r => !versionKeys.includes(r.key));
       this.db._replaceSheet('meta', cleanMeta.map(r => [r.key, r.value]));
     } else if (mode === 'merge') {
+      // Handle topics first
+      if (data['topics'] && data['topics'].length > 0) {
+        const existing = this.db._sheetToJson('topics');
+        const existingIds = new Set(existing.map(r => r[0]));
+        for (const item of data['topics']) {
+          if (!existingIds.has(item.id)) {
+            this.db._appendRows('topics', [[item.id, item.name, item.sort_order, item.created_at]]);
+          }
+        }
+      }
+
       for (const name of ['categories', 'tasks', 'stages', 'routine_records']) {
         if (data[name] && data[name].length > 0) {
           const existing = this.db._sheetToJson(name);
@@ -658,8 +691,8 @@ class Exporter {
           for (const item of data[name]) {
             if (!existingIds.has(item.id)) {
               const headers = {
-                categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at'],
-                tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order'],
+                categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'],
+                tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'],
                 stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
                 routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at']
               }[name];
@@ -707,6 +740,176 @@ class Exporter {
     const data = Exporter._readImportFile(filePath);
     return this.importExcelDBRaw(data, mode);
   }
+
+  // ---------- Kanban export ----------
+
+  exportKanban(targetPath, fromMonth, toMonth, personInCharge) {
+    const tasks = this.db.getExportData();
+    const cats = this.db.getCategories();
+    const topcs = this.db.getTopics();
+    const catMap = {};
+    for (const c of cats) catMap[c.id] = c;
+    const topicMap = {};
+    for (const t of topcs) topicMap[t.id] = t;
+
+    const headerRow = [
+      '任务名称', '任务类型', '负责人', '完成情况', '进度',
+      '进展描述', '工作量/交付物', '重要性', '开始时间', '结束时间',
+      '时长（公式计算）', '时长（手动填写）', '对接人', '备注'
+    ];
+
+    const rows = [headerRow];
+
+    for (const task of tasks) {
+      // Filter by date range
+      if (task.is_routine) {
+        if (fromMonth && toMonth) {
+          const rec = (task.records || []).find(r => r.year_month >= fromMonth && r.year_month <= toMonth);
+          if (!rec) continue;
+        }
+      } else {
+        if (fromMonth && toMonth) {
+          const taskYm = task.created_at ? task.created_at.substring(0, 7) : '';
+          if (taskYm > toMonth) continue;
+          if (task.completed_at && task.completed_at.substring(0, 7) < fromMonth) continue;
+        }
+      }
+
+      const cat = catMap[task.category_id];
+      const topic = cat ? topicMap[cat.topic_id] : null;
+
+      // Task name = 分类:任务名称
+      const taskName = (cat ? cat.name : '') + ':' + task.title;
+
+      // Task type = 专题名称
+      const taskType = topic ? topic.name : '';
+
+      // Person in charge
+      const charge = personInCharge || '';
+
+      // Completion status - empty
+      const completionStatus = '';
+
+      // Progress
+      let progress = '0%';
+      if (task.is_routine) {
+        progress = '—';
+      } else if (task.status === 'completed') {
+        progress = '100%';
+      } else if (task.status === 'created') {
+        progress = '0%';
+      } else if (task.progress) {
+        progress = task.progress + '%';
+      }
+
+      // Progress description
+      let progressDesc = '';
+      if (task.is_routine) {
+        progressDesc = task.description || '';
+      } else if ((task.stages || []).length <= 1) {
+        progressDesc = task.description || '';
+      } else {
+        const parts = [];
+        if (task.description) parts.push(task.description);
+        for (const s of (task.stages || [])) {
+          if (s.is_completed == 1 && s.note) parts.push(s.note);
+        }
+        progressDesc = parts.join('\n');
+      }
+
+      // Workload
+      let workload = '';
+      if (task.is_routine) {
+        const rec = (task.records || []).find(r => r.year_month >= (fromMonth || '') && r.year_month <= (toMonth || ''));
+        workload = rec ? String(rec.quantity) : '';
+      }
+
+      // Importance
+      const importance = task.importance || 1;
+
+      // Start time = task created_at, routine = empty
+      const startTime = task.is_routine ? '' : this._fmtDateTime(task.created_at);
+
+      // End time = completed_at if completed, otherwise empty. Routine = empty
+      const endTime = (task.is_routine) ? '' : (task.status === 'completed' ? this._fmtDateTime(task.completed_at) : '');
+
+      // Duration formula = empty
+      const durationFormula = '';
+
+      // Manual duration
+      const manualDuration = task.manual_duration || '';
+
+      // Contact person
+      const contactPerson = task.contact_person || '';
+
+      // Remarks = task description
+      const remarks = task.description || '';
+
+      rows.push([
+        taskName, taskType, charge, completionStatus, progress,
+        progressDesc, workload, importance, startTime, endTime,
+        durationFormula, manualDuration, contactPerson, remarks
+      ]);
+    }
+
+    const wb = xlsx.utils.book_new();
+    const ws = xlsx.utils.aoa_to_sheet(rows);
+
+    // Column widths
+    ws['!cols'] = [
+      { wch: 24 }, { wch: 12 }, { wch: 10 }, { wch: 10 }, { wch: 10 },
+      { wch: 40 }, { wch: 20 }, { wch: 10 }, { wch: 18 }, { wch: 18 },
+      { wch: 18 }, { wch: 16 }, { wch: 12 }, { wch: 30 }
+    ];
+
+    // Style header row
+    for (let C = 0; C < 14; C++) {
+      const addr = xlsx.utils.encode_cell({ r: 0, c: C });
+      if (!ws[addr]) ws[addr] = { v: headerRow[C], t: 's' };
+      ws[addr].s = {
+        font: { bold: true, sz: 12 },
+        fill: { patternType: 'solid', fgColor: { rgb: 'D9E1F2' } },
+        alignment: { horizontal: 'center', vertical: 'center', wrapText: true },
+        border: {
+          top: { style: 'thin', color: { rgb: '000000' } },
+          bottom: { style: 'thin', color: { rgb: '000000' } },
+          left: { style: 'thin', color: { rgb: '000000' } },
+          right: { style: 'thin', color: { rgb: '000000' } }
+        }
+      };
+    }
+
+    // Style data rows
+    for (let R = 1; R < rows.length; R++) {
+      for (let C = 0; C < 14; C++) {
+        const addr = xlsx.utils.encode_cell({ r: R, c: C });
+        if (!ws[addr]) {
+          ws[addr] = { v: rows[R][C] !== undefined ? rows[R][C] : '', t: 's' };
+        }
+        ws[addr].s = {
+          alignment: { vertical: 'center', wrapText: true },
+          border: {
+            top: { style: 'thin', color: { rgb: '000000' } },
+            bottom: { style: 'thin', color: { rgb: '000000' } },
+            left: { style: 'thin', color: { rgb: '000000' } },
+            right: { style: 'thin', color: { rgb: '000000' } }
+          }
+        };
+      }
+    }
+
+    // Row heights
+    ws['!rows'] = [{ hpx: 24 }];
+    for (let R = 1; R < rows.length; R++) ws['!rows'].push({ hpx: 30 });
+
+    xlsx.utils.book_append_sheet(wb, ws, '看板数据');
+
+    const dir = path.dirname(targetPath);
+    if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+    xlsx.writeFile(wb, targetPath);
+    return targetPath;
+  }
+
 }
 
 module.exports = Exporter;

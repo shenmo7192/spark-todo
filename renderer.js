@@ -1,4 +1,6 @@
+let topics = [];
 let categories = [];
+let currentTopicId = null;
 let currentCategoryId = null;
 let currentYearMonth = '';
 let tasks = [];
@@ -7,6 +9,8 @@ let selectedTaskIds = new Set();
 let deleteTargetId = null;
 let deleteTargetMode = 'single';
 let allMonths = [];
+let editingTopicId = null; // null = add, number = edit
+let currentStarRating = 1;
 
 const $ = (id) => document.getElementById(id);
 
@@ -56,9 +60,9 @@ async function init() {
     $('monthSelect').value = currentYearMonth.substring(5);
     $('yearSelect').value = currentYearMonth.substring(0, 4);
     try {
-      await loadCategories();
+      await loadTopics();
     } catch (e) {
-      console.error('loadCategories 失败:', e);
+      console.error('loadTopics 失败:', e);
     }
     try {
       await checkAllRoutineReminders();
@@ -69,6 +73,23 @@ async function init() {
     console.error('init 失败:', e);
   }
 }
+
+function setStarRating(val) {
+  currentStarRating = val;
+  const stars = document.querySelectorAll('#starRating .star');
+  stars.forEach(star => {
+    const sv = parseInt(star.dataset.val);
+    star.classList.toggle('active', sv > 0 && sv <= val);
+  });
+}
+
+// Wire up star rating clicks
+$('starRating').addEventListener('click', (e) => {
+  const star = e.target.closest('.star');
+  if (!star) return;
+  const val = parseInt(star.dataset.val);
+  setStarRating(val);
+});
 
 async function loadAllMonths() {
   const activeMonths = await window.electronAPI.getAllActiveMonths();
@@ -109,14 +130,128 @@ async function switchMonth(ym) {
   await loadTasks(currentCategoryId);
 }
 
-async function loadCategories() {
-  categories = await window.electronAPI.getCategories();
-  if (categories.length && !currentCategoryId) {
+async function loadTopics() {
+  topics = await window.electronAPI.getTopics();
+  if (topics.length && !currentTopicId) {
+    currentTopicId = topics[0].id;
+  }
+  renderTopicTabs();
+  await loadCategories(currentTopicId);
+}
+
+function renderTopicTabs() {
+  const bar = $('topicBar');
+  bar.innerHTML = '';
+  topics.forEach(topic => {
+    const wrap = document.createElement('div');
+    wrap.className = 'topic-wrap';
+
+    const btn = document.createElement('button');
+    btn.className = 'topic' + (topic.id === currentTopicId ? ' active' : '');
+    btn.textContent = topic.name;
+    btn.onclick = () => switchTopic(topic.id);
+
+    btn.addEventListener('dblclick', (e) => {
+      e.stopPropagation();
+      startTopicRename(topic, btn);
+    });
+
+    wrap.appendChild(btn);
+
+    const delBtn = document.createElement('button');
+    delBtn.className = 'topic-delete';
+    delBtn.innerHTML = '×';
+    delBtn.title = '删除专题';
+    delBtn.onclick = async (e) => {
+      e.stopPropagation();
+      await handleDeleteTopic(topic.id);
+    };
+
+    wrap.appendChild(delBtn);
+    bar.appendChild(wrap);
+  });
+  const addBtn = document.createElement('button');
+  addBtn.className = 'topic topic-add';
+  addBtn.textContent = '+';
+  addBtn.title = '添加专题';
+  addBtn.onclick = () => openTopicModal();
+  bar.appendChild(addBtn);
+}
+
+async function switchTopic(id) {
+  if (currentTopicId === id) return;
+  currentTopicId = id;
+  currentCategoryId = null;
+  selectedTaskIds.clear();
+  updateBulkBar();
+  renderTopicTabs();
+  await loadCategories(id);
+}
+
+function startTopicRename(topic, btn) {
+  const input = document.createElement('input');
+  input.type = 'text';
+  input.value = topic.name;
+  input.className = 'tab-edit-input';
+  input.style.cssText = 'flex:1;min-width:60px;padding:4px 8px;font-size:13px;border:2px solid var(--primary);border-radius:4px;outline:none;';
+
+  btn.replaceWith(input);
+  input.focus();
+  input.select();
+
+  const finish = async () => {
+    const newName = input.value.trim();
+    if (newName && newName !== topic.name) {
+      await window.electronAPI.updateTopic(topic.id, newName);
+      await loadTopics();
+      return;
+    }
+    input.replaceWith(btn);
+  };
+
+  input.addEventListener('blur', finish);
+  input.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') finish();
+    if (e.key === 'Escape') {
+      input.value = topic.name;
+      finish();
+    }
+  });
+}
+
+async function handleDeleteTopic(id) {
+  if (topics.length <= 1) {
+    alert('至少保留一个专题');
+    return;
+  }
+  const topic = topics.find(t => t.id === id);
+  if (!confirm(`确定删除专题"${topic.name}"？该专题下的分类将自动转移到第一个可用专题。`)) return;
+  try {
+    await window.electronAPI.deleteTopic(id);
+    if (currentTopicId === id) {
+      currentTopicId = null;
+      currentCategoryId = null;
+    }
+    await loadTopics();
+  } catch (e) {
+    alert('删除专题失败: ' + (e.message || '未知错误'));
+  }
+}
+
+async function loadCategories(topicId) {
+  categories = await window.electronAPI.getCategories(topicId);
+  if (categories.length && (!currentCategoryId || !categories.find(c => c.id === currentCategoryId))) {
     currentCategoryId = categories[0].id;
+  }
+  if (!categories.length) {
+    currentCategoryId = null;
+    tasks = [];
   }
   renderTabs();
   if (currentCategoryId) {
     await loadTasks(currentCategoryId);
+  } else {
+    renderTasks();
   }
 }
 
@@ -137,6 +272,12 @@ function renderTabs() {
       startTabRename(cat, btn);
     });
 
+    btn.addEventListener('contextmenu', (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      openMoveCatTopicModal(cat);
+    });
+
     if (idx > 0) {
       const leftBtn = document.createElement('button');
       leftBtn.className = 'tab-arrow tab-arrow-left';
@@ -145,7 +286,7 @@ function renderTabs() {
       leftBtn.onclick = async (e) => {
         e.stopPropagation();
         await window.electronAPI.moveCategory(cat.id, -1);
-        await loadCategories();
+        await loadCategories(currentTopicId);
       };
       wrap.appendChild(leftBtn);
     }
@@ -158,7 +299,7 @@ function renderTabs() {
       rightBtn.onclick = async (e) => {
         e.stopPropagation();
         await window.electronAPI.moveCategory(cat.id, 1);
-        await loadCategories();
+        await loadCategories(currentTopicId);
       };
       wrap.appendChild(rightBtn);
     }
@@ -202,7 +343,7 @@ function startTabRename(cat, btn) {
     const newName = input.value.trim();
     if (newName && newName !== cat.name) {
       await window.electronAPI.updateCategory(cat.id, newName);
-      await loadCategories();
+      await loadCategories(currentTopicId);
       return;
     }
     input.replaceWith(btn);
@@ -223,7 +364,7 @@ async function doDeleteCategory(id) {
   if (currentCategoryId === id) {
     currentCategoryId = null;
   }
-  await loadCategories();
+  await loadCategories(currentTopicId);
 }
 
 async function switchCategory(id) {
@@ -508,7 +649,8 @@ async function handleBulkDelete() {
 }
 
 async function checkAllRoutineReminders() {
-  const routineCats = categories.filter(c => c.is_routine);
+  const allCategories = await window.electronAPI.getCategories();
+  const routineCats = allCategories.filter(c => c.is_routine);
   const allMissing = [];
 
   for (const cat of routineCats) {
@@ -581,7 +723,12 @@ async function openTaskModal(taskId) {
   $('taskTitle').value = openedTask.title;
   $('taskDesc').value = openedTask.description || '';
 
-  populateTaskCategorySelect(openedTask);
+  // Populate extra fields
+  setStarRating(openedTask.importance || 1);
+  $('taskManualDuration').value = openedTask.manual_duration || '';
+  $('taskContactPerson').value = openedTask.contact_person || '';
+
+  await populateTaskCategorySelect(openedTask);
 
   const cat = categories.find(c => c.id === currentCategoryId);
   const isRoutine = cat ? cat.is_routine : false;
@@ -660,18 +807,27 @@ function autoSaveDescription(value) {
   }).catch(() => {});
 }
 
-function populateTaskCategorySelect(openedTask) {
+async function populateTaskCategorySelect(openedTask) {
   const sel = $('taskCategory');
   sel.innerHTML = '';
   const taskIsRoutine = openedTask ? openedTask.is_routine : false;
-  for (const cat of categories) {
-    // Only show categories of the same type
-    if (cat.is_routine !== taskIsRoutine) continue;
-    const opt = document.createElement('option');
-    opt.value = cat.id;
-    opt.textContent = cat.name;
-    if (cat.id === openedTask.category_id) opt.selected = true;
-    sel.appendChild(opt);
+  // Fetch all categories across all topics, not just current topic
+  const allCats = await window.electronAPI.getCategories();
+  const allTopics = await window.electronAPI.getTopics();
+
+  for (const topic of allTopics) {
+    const topicCats = allCats.filter(c => c.topic_id === topic.id && c.is_routine == taskIsRoutine);
+    if (topicCats.length === 0) continue;
+    const group = document.createElement('optgroup');
+    group.label = topic.name;
+    for (const cat of topicCats) {
+      const opt = document.createElement('option');
+      opt.value = cat.id;
+      opt.textContent = cat.name;
+      if (cat.id === openedTask.category_id) opt.selected = true;
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
   }
 }
 
@@ -994,7 +1150,8 @@ async function saveAndCloseTaskModal() {
 
   const newCategoryId = parseInt($('taskCategory').value);
   if (newCategoryId && newCategoryId !== openedTask.category_id) {
-    const targetCat = categories.find(c => c.id === newCategoryId);
+    const allCats = await window.electronAPI.getCategories();
+    const targetCat = allCats.find(c => c.id === newCategoryId);
     if (targetCat && targetCat.is_routine === openedTask.is_routine) {
       await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
     }
@@ -1002,13 +1159,19 @@ async function saveAndCloseTaskModal() {
 
   openedTask.title = title;
   openedTask.description = $('taskDesc').value;
+  openedTask.importance = currentStarRating;
+  openedTask.manual_duration = $('taskManualDuration').value.trim();
+  openedTask.contact_person = $('taskContactPerson').value.trim();
 
   await window.electronAPI.updateTask({
     id: openedTask.id,
     title: openedTask.title,
     description: openedTask.description,
     status: openedTask.status,
-    progress: openedTask.progress
+    progress: openedTask.progress,
+    importance: openedTask.importance,
+    manual_duration: openedTask.manual_duration,
+    contact_person: openedTask.contact_person
   });
 
   await closeTaskModal();
@@ -1097,6 +1260,7 @@ function openCatModal() {
   $('catModalOverlay').classList.add('show');
   $('catName').value = '';
   $('catIsRoutine').checked = false;
+  populateTopicSelect($('catTopic'));
 }
 function closeCatModal() {
   $('catModalOverlay').classList.remove('show');
@@ -1107,9 +1271,94 @@ $('btnSaveCategory').onclick = async () => {
   const name = $('catName').value.trim();
   if (!name) return alert('请输入分类名称');
   const isRoutine = $('catIsRoutine').checked;
-  await window.electronAPI.addCategory(name, isRoutine);
+  const topicId = parseInt($('catTopic').value);
+  if (!topicId) return alert('请选择所属专题');
+  await window.electronAPI.addCategory(name, isRoutine, topicId);
   closeCatModal();
-  await loadCategories();
+  await loadCategories(currentTopicId);
+};
+
+function populateTopicSelect(sel) {
+  sel.innerHTML = '';
+  for (const t of topics) {
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    if (t.id === currentTopicId) opt.selected = true;
+    sel.appendChild(opt);
+  }
+}
+
+// Topic modal
+function openTopicModal(id) {
+  editingTopicId = id || null;
+  $('topicModalOverlay').classList.add('show');
+  if (id) {
+    $('topicModalTitle').textContent = '编辑专题';
+    const topic = topics.find(t => t.id === id);
+    $('topicName').value = topic ? topic.name : '';
+  } else {
+    $('topicModalTitle').textContent = '添加专题';
+    $('topicName').value = '';
+  }
+  setTimeout(() => $('topicName').focus(), 50);
+}
+function closeTopicModal() {
+  $('topicModalOverlay').classList.remove('show');
+  editingTopicId = null;
+}
+
+$('btnAddTopic').addEventListener('click', () => openTopicModal());
+$('btnCloseTopicModal').onclick = closeTopicModal;
+$('topicModalOverlay').onclick = (e) => { if (e.target === $('topicModalOverlay')) closeTopicModal(); };
+$('btnSaveTopic').onclick = async () => {
+  const name = $('topicName').value.trim();
+  if (!name) return alert('请输入专题名称');
+  if (editingTopicId) {
+    await window.electronAPI.updateTopic(editingTopicId, name);
+  } else {
+    await window.electronAPI.addTopic(name);
+  }
+  closeTopicModal();
+  await loadTopics();
+};
+
+// Move Category Topic modal
+let moveCatTopicTarget = null;
+
+function openMoveCatTopicModal(cat) {
+  moveCatTopicTarget = cat;
+  $('moveCatTopicModalOverlay').classList.add('show');
+  $('moveCatTopicText').textContent = `将分类"${cat.name}"切换到以下专题：`;
+  const sel = $('moveCatTopicSelect');
+  sel.innerHTML = '';
+  for (const t of topics) {
+    if (t.id === cat.topic_id) continue;
+    const opt = document.createElement('option');
+    opt.value = t.id;
+    opt.textContent = t.name;
+    sel.appendChild(opt);
+  }
+  if (sel.options.length === 0) {
+    sel.innerHTML = '<option value="">没有其他专题</option>';
+  }
+}
+
+function closeMoveCatTopicModal() {
+  $('moveCatTopicModalOverlay').classList.remove('show');
+  moveCatTopicTarget = null;
+}
+
+$('btnCloseMoveCatTopicModal').onclick = closeMoveCatTopicModal;
+$('moveCatTopicModalOverlay').onclick = (e) => { if (e.target === $('moveCatTopicModalOverlay')) closeMoveCatTopicModal(); };
+$('btnConfirmMoveCatTopic').onclick = async () => {
+  if (!moveCatTopicTarget) return;
+  const newTopicId = parseInt($('moveCatTopicSelect').value);
+  if (!newTopicId) return;
+  const cat = moveCatTopicTarget;
+  await window.electronAPI.updateCategory(cat.id, cat.name, undefined, newTopicId);
+  closeMoveCatTopicModal();
+  await loadCategories(currentTopicId);
 };
 
 // Export modal
@@ -1282,6 +1531,114 @@ $('btnConfirmExport').onclick = async () => {
   }
 };
 
+// Kanban export modal
+function openKanbanModal() {
+  $('kanbanModalOverlay').classList.add('show');
+  $('kanbanExportMode').value = 'all';
+  populateKanbanSelects();
+  updateKanbanModeUI();
+}
+function closeKanbanModal() {
+  $('kanbanModalOverlay').classList.remove('show');
+}
+
+function populateKanbanSelects() {
+  const yearSel = $('kanbanYear');
+  const qYearSel = $('kanbanQuarterYear');
+  const monthSel = $('kanbanMonth');
+
+  const years = new Set();
+  for (const ym of allMonths) years.add(ym.substring(0, 4));
+  const sortedYears = Array.from(years).sort();
+  const currentYear = new Date().getFullYear();
+
+  yearSel.innerHTML = '';
+  for (const y of sortedYears) {
+    const opt = document.createElement('option');
+    opt.value = y;
+    opt.textContent = y + '年';
+    if (y === currentYear) opt.selected = true;
+    yearSel.appendChild(opt);
+  }
+  qYearSel.innerHTML = yearSel.innerHTML;
+
+  monthSel.innerHTML = '';
+  for (const ym of allMonths) {
+    const opt = document.createElement('option');
+    opt.value = ym;
+    opt.textContent = ym;
+    if (ym === currentYearMonth) opt.selected = true;
+    monthSel.appendChild(opt);
+  }
+}
+
+function updateKanbanModeUI() {
+  const mode = $('kanbanExportMode').value;
+  $('kanbanYearlyOpts').style.display = mode === 'yearly' ? 'block' : 'none';
+  $('kanbanQuarterlyOpts').style.display = mode === 'quarterly' ? 'block' : 'none';
+  $('kanbanMonthlyOpts').style.display = mode === 'monthly' ? 'block' : 'none';
+}
+
+$('btnKanban').onclick = openKanbanModal;
+$('btnCloseKanbanModal').onclick = closeKanbanModal;
+$('kanbanModalOverlay').onclick = (e) => { if (e.target === $('kanbanModalOverlay')) closeKanbanModal(); };
+$('kanbanExportMode').onchange = updateKanbanModeUI;
+
+$('btnConfirmKanbanExport').onclick = async () => {
+  const mode = $('kanbanExportMode').value;
+  let fromMonth, toMonth, defaultFileName;
+
+  if (mode === 'yearly') {
+    const year = $('kanbanYear').value;
+    fromMonth = `${year}-01`;
+    toMonth = `${year}-12`;
+    defaultFileName = `看板数据_${year}年度.xlsx`;
+  } else if (mode === 'quarterly') {
+    const year = $('kanbanQuarterYear').value;
+    const q = parseInt($('kanbanQuarter').value);
+    const qStart = String((q - 1) * 3 + 1).padStart(2, '0');
+    const qEnd = String((q - 1) * 3 + 3).padStart(2, '0');
+    fromMonth = `${year}-${qStart}`;
+    toMonth = `${year}-${qEnd}`;
+    defaultFileName = `看板数据_${year}年Q${q}.xlsx`;
+  } else if (mode === 'monthly') {
+    fromMonth = $('kanbanMonth').value;
+    toMonth = fromMonth;
+    defaultFileName = `看板数据_${fromMonth}.xlsx`;
+  } else {
+    // all
+    fromMonth = null;
+    toMonth = null;
+    defaultFileName = `看板数据_全部.xlsx`;
+  }
+
+  const isElectron = typeof window.electronAPI.getVersion === 'function';
+  if (isElectron) {
+    const result = await window.electronAPI.showSaveDialog({
+      title: '保存看板数据',
+      defaultPath: defaultFileName,
+      filters: [{ name: 'Excel 文件', extensions: ['xlsx'] }]
+    });
+    if (!result.canceled && result.filePath) {
+      const res = await window.electronAPI.exportKanban(result.filePath, fromMonth, toMonth);
+      if (res.success) {
+        alert('看板数据导出成功！');
+        closeKanbanModal();
+      } else {
+        alert('导出失败: ' + (res.error || '未知错误'));
+      }
+    }
+  } else {
+    const res = await window.electronAPI.exportKanban(defaultFileName, fromMonth, toMonth);
+    if (res.success) {
+      alert('看板数据导出成功');
+      closeKanbanModal();
+    } else {
+      alert('导出失败: ' + (res.error || '未知错误'));
+    }
+  }
+};
+
 // Delete modal
 function openDeleteModal() {
   $('deleteModalOverlay').classList.add('show');
@@ -1428,20 +1785,30 @@ async function loadOverviewData() {
 }
 
 // Bulk move category modal
-function openBulkMoveModal() {
+async function openBulkMoveModal() {
   const cat = categories.find(c => c.id === currentCategoryId);
   const currentIsRoutine = cat ? cat.is_routine : false;
   $('bulkMoveText').textContent = `将选中的 ${selectedTaskIds.size} 个任务迁移到以下分类（仅限同类型）：`;
   const sel = $('bulkMoveCategory');
   sel.innerHTML = '';
-  for (const c of categories) {
-    if (c.id === currentCategoryId) continue;
-    if (c.is_routine !== currentIsRoutine) continue;
-    const opt = document.createElement('option');
-    opt.value = c.id;
-    opt.textContent = c.name;
-    sel.appendChild(opt);
+
+  const allCats = await window.electronAPI.getCategories();
+  const allTopics = await window.electronAPI.getTopics();
+
+  for (const topic of allTopics) {
+    const topicCats = allCats.filter(c => c.topic_id === topic.id && c.is_routine == currentIsRoutine && c.id !== currentCategoryId);
+    if (topicCats.length === 0) continue;
+    const group = document.createElement('optgroup');
+    group.label = topic.name;
+    for (const c of topicCats) {
+      const opt = document.createElement('option');
+      opt.value = c.id;
+      opt.textContent = c.name;
+      group.appendChild(opt);
+    }
+    sel.appendChild(group);
   }
+
   if (sel.options.length === 0) {
     sel.innerHTML = '<option value="">没有可用的同类型分类</option>';
   }
@@ -1494,11 +1861,21 @@ async function loadSettingsInfo() {
     $('settingsDbSchema').textContent = '1';
     $('settingsPlatform').textContent = 'Web (浏览器)';
   }
+  try {
+    const personInCharge = await window.electronAPI.getSetting('person_in_charge');
+    $('settingsPersonInCharge').value = personInCharge || '';
+  } catch (e) {}
 }
 
 $('btnSettings').onclick = openSettingsModal;
 $('btnCloseSettingsModal').onclick = closeSettingsModal;
 $('settingsModalOverlay').onclick = (e) => { if (e.target === $('settingsModalOverlay')) closeSettingsModal(); };
+
+$('btnSavePersonInCharge').onclick = async () => {
+  const name = $('settingsPersonInCharge').value.trim();
+  await window.electronAPI.setSetting('person_in_charge', name);
+  alert('负责人已保存');
+};
 
 $('btnExportDB').onclick = async () => {
   const isElectron = typeof window.electronAPI.getVersion === 'function';
@@ -1597,7 +1974,7 @@ $('btnImportReplace').onclick = async () => {
   try {
     await window.electronAPI.importData(importData, 'replace');
     alert('数据已导入（替换模式），正在刷新...');
-    await loadCategories();
+    await loadTopics();
     if (currentCategoryId) await loadTasks(currentCategoryId);
     await loadAllMonths();
     populateExportMonthSelects();
@@ -1613,7 +1990,7 @@ $('btnImportMerge').onclick = async () => {
   try {
     await window.electronAPI.importData(importData, 'merge');
     alert('数据已导入（合并模式），正在刷新...');
-    await loadCategories();
+    await loadTopics();
     if (currentCategoryId) await loadTasks(currentCategoryId);
     await loadAllMonths();
     populateExportMonthSelects();
