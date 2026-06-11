@@ -34,7 +34,7 @@
       "export.js",
       "index.html",
       "styles.css",
-      "renderer.js",
+      "src/**/*.js",
       "assets/**/*",
       "node_modules/**/*"
     ],
