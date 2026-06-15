@@ -107,23 +107,23 @@ $('btnConfirmExport').onclick = async function() {
     defaultFileName = '工单台账_' + qyear + '年Q' + q + '.xlsx';
   } else if (mode === 'custom') {
     fromMonth = $('exportStartMonth').value; toMonth = $('exportEndMonth').value;
-    if (fromMonth > toMonth) return alert('起始月份不能大于结束月份');
+    if (fromMonth > toMonth) return showToast('起始月份不能大于结束月份', 'error');
     defaultFileName = '工单台账_' + fromMonth + '_至_' + toMonth + '.xlsx';
   } else {
     var dirPath = $('exportDirPath').value;
     var startMonth = $('exportStartMonth').value;
     var endMonth = $('exportEndMonth').value;
     if (isElectron) {
-      if (!dirPath) return alert('请选择导出目录');
-      if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+      if (!dirPath) return showToast('请选择导出目录', 'error');
+      if (startMonth > endMonth) return showToast('起始月份不能大于结束月份', 'error');
       var res = await window.electronAPI.exportMonthly(dirPath, startMonth, endMonth);
-      if (res.success) { alert('导出成功'); closeExportModal(); }
-      else { alert('导出失败: ' + (res.error || '未知错误')); }
+      if (res.success) { showToast('导出成功'); closeExportModal(); }
+      else { showToast('导出失败: ' + (res.error || '未知错误'), 'error'); }
     } else {
-      if (startMonth > endMonth) return alert('起始月份不能大于结束月份');
+      if (startMonth > endMonth) return showToast('起始月份不能大于结束月份', 'error');
       var res2 = await window.electronAPI.exportMonthly(dirPath || '台账', startMonth, endMonth);
-      if (res2.success) { alert('导出成功 (' + (res2.fileCount || 0) + ' 个文件)'); closeExportModal(); }
-      else { alert('导出失败: ' + (res2.error || '未知错误')); }
+      if (res2.success) { showToast('导出成功 (' + (res2.fileCount || 0) + ' 个文件)'); closeExportModal(); }
+      else { showToast('导出失败: ' + (res2.error || '未知错误'), 'error'); }
     }
     return;
   }
@@ -135,13 +135,13 @@ $('btnConfirmExport').onclick = async function() {
     });
     if (!result.canceled && result.filePath) {
       var res3 = await window.electronAPI.exportExcel(result.filePath, fromMonth, toMonth);
-      if (res3.success) { alert('导出成功！'); closeExportModal(); }
-      else { alert('导出失败: ' + (res3.error || '未知错误')); }
+      if (res3.success) { showToast('导出成功！'); closeExportModal(); }
+      else { showToast('导出失败: ' + (res3.error || '未知错误'), 'error'); }
     }
   } else {
     var res4 = await window.electronAPI.exportExcel(defaultFileName, fromMonth, toMonth);
-    if (res4.success) { alert('导出成功'); closeExportModal(); }
-    else { alert('导出失败: ' + (res4.error || '未知错误')); }
+    if (res4.success) { showToast('导出成功'); closeExportModal(); }
+    else { showToast('导出失败: ' + (res4.error || '未知错误'), 'error'); }
   }
 };
 
@@ -229,12 +229,12 @@ $('btnConfirmKanbanExport').onclick = async function() {
     });
     if (!result.canceled && result.filePath) {
       var res = await window.electronAPI.exportKanban(result.filePath, fromMonth, toMonth);
-      if (res.success) { alert('看板数据导出成功！'); closeKanbanModal(); }
-      else { alert('导出失败: ' + (res.error || '未知错误')); }
+      if (res.success) { showToast('看板数据导出成功！'); closeKanbanModal(); }
+      else { showToast('导出失败: ' + (res.error || '未知错误'), 'error'); }
     }
   } else {
     var res2 = await window.electronAPI.exportKanban(defaultFileName, fromMonth, toMonth);
-    if (res2.success) { alert('看板数据导出成功'); closeKanbanModal(); }
-    else { alert('导出失败: ' + (res2.error || '未知错误')); }
+    if (res2.success) { showToast('看板数据导出成功'); closeKanbanModal(); }
+    else { showToast('导出失败: ' + (res2.error || '未知错误'), 'error'); }
   }
 };

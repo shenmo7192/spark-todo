@@ -158,6 +158,7 @@ ipcMain.handle('db:getAllTasksByYear', safeHandler((_, year) => db.getAllTasksBy
 ipcMain.handle('db:batchReorderTasks', safeHandler((_, categoryId, taskIds) => db.batchReorderTasks(categoryId, taskIds)));
 ipcMain.handle('db:changeTaskCategory', safeHandler((_, taskId, newCategoryId) => db.changeTaskCategory(taskId, newCategoryId)));
 ipcMain.handle('db:bulkChangeTaskCategory', safeHandler((_, taskIds, newCategoryId) => db.bulkChangeTaskCategory(taskIds, newCategoryId)));
+ipcMain.handle('db:getCategoryPendingCounts', safeHandler((_, topicId) => db.getCategoryPendingCounts(topicId)));
 
 ipcMain.handle('db:getSetting', safeHandler((_, key) => db.getSetting(key)));
 ipcMain.handle('db:setSetting', safeHandler((_, key, value) => db.setSetting(key, value)));

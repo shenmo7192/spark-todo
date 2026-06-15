@@ -39,6 +39,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   batchReorderTasks: (categoryId, taskIds) => ipcRenderer.invoke('db:batchReorderTasks', categoryId, taskIds),
   changeTaskCategory: (taskId, newCategoryId) => ipcRenderer.invoke('db:changeTaskCategory', taskId, newCategoryId),
   bulkChangeTaskCategory: (taskIds, newCategoryId) => ipcRenderer.invoke('db:bulkChangeTaskCategory', taskIds, newCategoryId),
+  getCategoryPendingCounts: (topicId) => ipcRenderer.invoke('db:getCategoryPendingCounts', topicId),
 
   // Settings
   getSetting: (key) => ipcRenderer.invoke('db:getSetting', key),

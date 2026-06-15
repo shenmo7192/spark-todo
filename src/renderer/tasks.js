@@ -7,12 +7,23 @@ async function loadTasks(categoryId) {
   tasks.sort(function(a, b) {
     var aDone = a.status === 'completed' ? 1 : 0;
     var bDone = b.status === 'completed' ? 1 : 0;
-    if (aDone !== bDone) return aDone - bDone;
-    var aOrder = parseInt(a.sort_order) || 0;
-    var bOrder = parseInt(b.sort_order) || 0;
-    if (aOrder !== bOrder) return aOrder - bOrder;
-    return new Date(b.created_at) - new Date(a.created_at);
+    if (sortOrder === 'status') {
+      if (aDone !== bDone) return aDone - bDone;
+      var aOrder = parseInt(a.sort_order) || 0;
+      var bOrder = parseInt(b.sort_order) || 0;
+      if (aOrder !== bOrder) return aOrder - bOrder;
+      return new Date(b.created_at) - new Date(a.created_at);
+    } else {
+      // 'time' - sort by creation time, newest first
+      return new Date(b.created_at) - new Date(a.created_at);
+    }
   });
+  // Refresh pending counts
+  try {
+    pendingCounts = await window.electronAPI.getCategoryPendingCounts();
+    renderTabs();
+    renderTopicTabs();
+  } catch(e) {}
   renderTasks();
 }
 
@@ -270,3 +281,17 @@ function handleBulkDelete() {
   $('deleteConfirmText').textContent = '确定删除选中的 ' + selectedTaskIds.size + ' 个任务？此操作不可恢复。';
   openDeleteModal();
 }
+
+// Sort order toggle
+$('btnSortOrder').onclick = async function() {
+  sortOrder = sortOrder === 'status' ? 'time' : 'status';
+  var btn = $('btnSortOrder');
+  if (sortOrder === 'status') {
+    btn.innerHTML = '↓ 按状态';
+    btn.title = '切换为按时间排序';
+  } else {
+    btn.innerHTML = '↓ 按时间';
+    btn.title = '切换为按状态排序';
+  }
+  await loadTasks(currentCategoryId);
+};

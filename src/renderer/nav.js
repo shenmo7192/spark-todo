@@ -448,8 +448,8 @@ $('btnExportDB').onclick = async function() {
     });
     if (!result.canceled && result.filePath) {
       var res = await window.electronAPI.exportExcelDB(result.filePath);
-      if (res.success) { alert('数据备份导出成功！'); closeSettingsModal(); }
-      else { alert('导出失败: ' + (res.error || '未知错误')); }
+      if (res.success) { showToast('数据备份导出成功！'); closeSettingsModal(); }
+      else { showToast('导出失败: ' + (res.error || '未知错误'), 'error'); }
     }
   } else {
     closeSettingsModal();

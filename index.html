@@ -31,7 +31,10 @@
     </div>
 
     <div class="toolbar">
-      <button class="btn btn-primary" id="btnAddTask">+ 新建任务</button>
+      <div class="toolbar-left">
+        <button class="btn btn-primary" id="btnAddTask">+ 新建任务</button>
+        <button class="btn btn-sort" id="btnSortOrder" title="切换排序方式">↓ 按状态</button>
+      </div>
       <div class="bulk-bar" id="bulkBar" style="display:none;">
         <span id="bulkCount">已选择 0 项</span>
         <button class="btn btn-sm" id="btnBulkComplete">批量完成</button>
@@ -481,6 +484,9 @@
       </div>
     </div>
   </div>
+
+  <!-- Toast notification -->
+  <div class="toast-container" id="toastContainer"></div>
 
   <script src="src/renderer/state.js"></script>
   <script src="src/renderer/tabs.js"></script>

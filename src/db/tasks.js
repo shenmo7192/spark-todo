@@ -241,6 +241,27 @@ module.exports = {
     return newCarries.length;
   },
 
+  getCategoryPendingCounts: function(topicId) {
+    var allCategories = this.getCategories();
+    if (topicId !== undefined && topicId !== null) {
+      allCategories = allCategories.filter(function(c) { return c.topic_id == topicId; });
+    }
+    var allTasks = this._sheetToJson(SHEETS.tasks).map(function(r) {
+      return { id: r[0], category_id: r[1], status: r[4] };
+    });
+    var counts = {};
+    for (var i = 0; i < allCategories.length; i++) {
+      counts[allCategories[i].id] = 0;
+    }
+    for (var j = 0; j < allTasks.length; j++) {
+      var task = allTasks[j];
+      if (task.status !== 'completed' && counts[task.category_id] !== undefined) {
+        counts[task.category_id]++;
+      }
+    }
+    return counts;
+  },
+
   getCarriedTasks: function(categoryId, yearMonth) {
     const taskIds = this._sheetToJson(SHEETS.tasks)
       .filter(function(r) { return r[1] == categoryId && !r[6]; })

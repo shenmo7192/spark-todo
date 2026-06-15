@@ -13,6 +13,9 @@ var allMonths = [];
 var editingTopicId = null;
 var currentStarRating = 1;
 var globalNoteTimer = null;
+var sortOrder = 'status';          // 'status' | 'time'
+var pendingCounts = {};            // categoryId -> count
+var allCategories = [];            // all categories (across all topics) for topic badge counts
 
 function $(id) { return document.getElementById(id); }
 
@@ -39,4 +42,20 @@ function escapeHtml(str) {
   var div = document.createElement('div');
   div.textContent = str;
   return div.innerHTML;
+}
+
+function showToast(msg, type) {
+  type = type || 'success';
+  var container = $('toastContainer');
+  var toast = document.createElement('div');
+  toast.className = 'toast toast-' + type;
+  toast.textContent = msg;
+  container.appendChild(toast);
+  // Trigger reflow for animation
+  void toast.offsetWidth;
+  toast.classList.add('show');
+  setTimeout(function() {
+    toast.classList.remove('show');
+    setTimeout(function() { toast.remove(); }, 300);
+  }, 3000);
 }

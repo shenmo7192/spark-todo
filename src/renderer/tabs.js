@@ -5,6 +5,10 @@ async function loadTopics() {
   if (topics.length && !currentTopicId) {
     currentTopicId = topics[0].id;
   }
+  // Fetch all categories for topic badge counts (done here once at init)
+  try {
+    allCategories = await window.electronAPI.getCategories();
+  } catch(e) { allCategories = []; }
   renderTopicTabs();
   await loadCategories(currentTopicId);
 }
@@ -20,6 +24,19 @@ function renderTopicTabs() {
     btn.className = 'topic' + (topic.id === currentTopicId ? ' active' : '');
     btn.textContent = topic.name;
     btn.onclick = function() { switchTopic(topic.id); };
+
+    // Show pending count badge
+    var topicCats = allCategories.filter(function(c) { return c.topic_id === topic.id; });
+    var topicCount = 0;
+    for (var i = 0; i < topicCats.length; i++) {
+      topicCount += (pendingCounts[topicCats[i].id] || 0);
+    }
+    if (topicCount > 0) {
+      var badge = document.createElement('span');
+      badge.className = 'tab-count-badge';
+      badge.textContent = topicCount;
+      btn.appendChild(badge);
+    }
 
     btn.addEventListener('dblclick', function(e) {
       e.stopPropagation();
@@ -117,7 +134,13 @@ async function loadCategories(topicId) {
     currentCategoryId = null;
     tasks = [];
   }
+  // Refresh pending counts and all categories for badges
+  try {
+    allCategories = await window.electronAPI.getCategories();
+    pendingCounts = await window.electronAPI.getCategoryPendingCounts();
+  } catch(e) { pendingCounts = {}; }
   renderTabs();
+  renderTopicTabs();
   if (currentCategoryId) {
     await loadTasks(currentCategoryId);
   } else {
@@ -136,6 +159,15 @@ function renderTabs() {
     btn.className = 'tab' + (cat.id === currentCategoryId ? ' active' : '');
     btn.textContent = cat.name;
     btn.onclick = function() { switchCategory(cat.id); };
+
+    // Show pending count badge
+    var catCount = pendingCounts[cat.id] || 0;
+    if (catCount > 0) {
+      var countBadge = document.createElement('span');
+      countBadge.className = 'tab-count-badge';
+      countBadge.textContent = catCount;
+      btn.appendChild(countBadge);
+    }
 
     btn.addEventListener('dblclick', function(e) {
       e.stopPropagation();
