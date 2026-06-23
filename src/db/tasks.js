@@ -27,6 +27,13 @@ module.exports = {
   },
 
   getTasks: function(categoryId, yearMonth) {
+    const category = this.getCategories().find(function(c) { return c.id == categoryId; });
+    const categoryEndedAt = category ? (category.ended_at || '') : '';
+    if (yearMonth && categoryEndedAt) {
+      const endedYm = categoryEndedAt.substring(0, 7);
+      if (yearMonth > endedYm) return [];
+    }
+
     const allTasks = this._sheetToJson(SHEETS.tasks).map(function(r) {
       return {
         id: r[0], category_id: r[1], title: r[2], description: r[3], status: r[4],

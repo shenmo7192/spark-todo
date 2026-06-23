@@ -74,6 +74,11 @@ module.exports = {
       for (let m = 1; m <= 12; m++) {
         const ym = year + '-' + String(m).padStart(2, '0');
 
+        if (taskCategory && taskCategory.ended_at) {
+          const endedYm = taskCategory.ended_at.substring(0, 7);
+          if (ym > endedYm) continue;
+        }
+
         if (createdYm && createdYm > ym) continue;
         if (completedYm && completedYm < ym) continue;
 

@@ -52,8 +52,8 @@ class IndexedDBStorage {
   async _seedDefaultData() {
     const cats = await this._getAll('categories');
     if (cats.length === 0) {
-      await this._put('categories', { id: 1, name: '工作任务', is_routine: 0, sort_order: 0, created_at: new Date().toISOString() });
-      await this._put('categories', { id: 2, name: '日常工作', is_routine: 1, sort_order: 1, created_at: new Date().toISOString() });
+      await this._put('categories', { id: 1, name: '工作任务', is_routine: 0, sort_order: 0, created_at: new Date().toISOString(), ended_at: '' });
+      await this._put('categories', { id: 2, name: '日常工作', is_routine: 1, sort_order: 1, created_at: new Date().toISOString(), ended_at: '' });
       await this._put('meta', { key: 'last_category_id', value: 2 });
       await this._put('meta', { key: 'last_task_id', value: 0 });
       await this._put('meta', { key: 'last_stage_id', value: 0 });
@@ -139,7 +139,7 @@ class IndexedDBStorage {
     const id = await this._nextId('category');
     await this._put('categories', {
       id, name, is_routine: isRoutine ? 1 : 0, sort_order: maxOrder + 1,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(), ended_at: ''
     });
     return id;
   }
@@ -164,6 +164,22 @@ class IndexedDBStorage {
     cats[targetIdx].sort_order = tmp;
     await this._put('categories', cats[idx]);
     await this._put('categories', cats[targetIdx]);
+    return true;
+  }
+
+  async endCategory(id) {
+    const cat = await this._get('categories', id);
+    if (!cat) return false;
+    cat.ended_at = new Date().toISOString();
+    await this._put('categories', cat);
+    return true;
+  }
+
+  async reopenCategory(id) {
+    const cat = await this._get('categories', id);
+    if (!cat) return false;
+    cat.ended_at = '';
+    await this._put('categories', cat);
     return true;
   }
 
@@ -199,6 +215,14 @@ class IndexedDBStorage {
   }
 
   async getTasks(categoryId, yearMonth) {
+    const allCategories = await this.getCategories();
+    const category = allCategories.find(c => c.id === categoryId);
+    const categoryEndedAt = category ? (category.ended_at || '') : '';
+    if (yearMonth && categoryEndedAt) {
+      const endedYm = categoryEndedAt.substring(0, 7);
+      if (yearMonth > endedYm) return [];
+    }
+
     const allTasks = await this._getAll('tasks');
     const tasks = allTasks.filter(t => t.category_id === categoryId);
     const carried = await this._getCarriedTasks(categoryId, yearMonth);
@@ -473,6 +497,13 @@ class IndexedDBStorage {
   }
 
   async checkRoutineUnfilled(categoryId, yearMonth) {
+    const allCategories = await this.getCategories();
+    const category = allCategories.find(c => c.id === categoryId);
+    if (category && category.ended_at) {
+      const endedYm = category.ended_at.substring(0, 7);
+      if (yearMonth > endedYm) return [];
+    }
+
     const routineTasks = await this.getRoutineTasksByCategory(categoryId);
     const [y, m] = yearMonth.split('-').map(Number);
     const lastM = m === 1 ? 12 : m - 1;
@@ -570,6 +601,11 @@ class IndexedDBStorage {
 
       for (let m = 1; m <= 12; m++) {
         const ym = `${year}-${String(m).padStart(2, '0')}`;
+
+        if (taskCategory && taskCategory.ended_at) {
+          const endedYm = taskCategory.ended_at.substring(0, 7);
+          if (ym > endedYm) continue;
+        }
 
         if (createdYm && createdYm > ym) continue;
         if (completedYm && completedYm < ym) continue;

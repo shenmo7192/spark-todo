@@ -78,6 +78,14 @@ body {
   content: ''; position: absolute; bottom: -2px; left: 0; right: 0;
   height: 2px; background: var(--primary);
 }
+.tab.ended {
+  color: var(--text-secondary);
+  font-style: italic;
+  text-decoration: line-through;
+  opacity: 0.75;
+}
+.tab.ended.active { color: var(--warning); }
+.tab.ended.active::after { background: var(--warning); }
 .tab-add { font-weight: 700; color: var(--primary); }
 
 .toolbar {
@@ -470,3 +478,32 @@ body {
 .toast.show { opacity: 1; transform: translateX(0); }
 .toast-success { background: #16a34a; }
 .toast-error { background: #dc2626; }
+
+/* Category context menu */
+.category-context-menu {
+  position: fixed;
+  background: var(--card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: var(--shadow-lg);
+  z-index: 200;
+  min-width: 140px;
+  padding: 4px 0;
+  font-size: 13px;
+}
+.category-context-menu-item {
+  padding: 8px 14px;
+  cursor: pointer;
+  color: var(--text);
+  transition: background .15s;
+  white-space: nowrap;
+}
+.category-context-menu-item:hover {
+  background: #f3f4f6;
+}
+.category-context-menu-item.danger {
+  color: var(--danger);
+}
+.category-context-menu-item.danger:hover {
+  background: #fee2e2;
+}

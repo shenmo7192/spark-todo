@@ -1,5 +1,12 @@
 // Topic & category tab management
 
+function isCategoryVisibleForMonth(cat, yearMonth) {
+  if (!yearMonth) return true;
+  if (!cat.ended_at) return true;
+  var endedYm = cat.ended_at.substring(0, 7);
+  return endedYm >= yearMonth;
+}
+
 async function loadTopics() {
   topics = await window.electronAPI.getTopics();
   if (topics.length && !currentTopicId) {
@@ -8,6 +15,7 @@ async function loadTopics() {
   // Fetch all categories for topic badge counts (done here once at init)
   try {
     allCategories = await window.electronAPI.getCategories();
+    allCategories = allCategories.filter(function(c) { return isCategoryVisibleForMonth(c, currentYearMonth); });
   } catch(e) { allCategories = []; }
   renderTopicTabs();
   await loadCategories(currentTopicId);
@@ -126,7 +134,8 @@ async function handleDeleteTopic(id) {
 }
 
 async function loadCategories(topicId) {
-  categories = await window.electronAPI.getCategories(topicId);
+  var topicCategories = await window.electronAPI.getCategories(topicId);
+  categories = topicCategories.filter(function(c) { return isCategoryVisibleForMonth(c, currentYearMonth); });
   if (categories.length && (!currentCategoryId || !categories.find(function(c) { return c.id === currentCategoryId; }))) {
     currentCategoryId = categories[0].id;
   }
@@ -137,6 +146,7 @@ async function loadCategories(topicId) {
   // Refresh pending counts and all categories for badges
   try {
     allCategories = await window.electronAPI.getCategories();
+    allCategories = allCategories.filter(function(c) { return isCategoryVisibleForMonth(c, currentYearMonth); });
     pendingCounts = await window.electronAPI.getCategoryPendingCounts();
   } catch(e) { pendingCounts = {}; }
   renderTabs();
@@ -155,9 +165,11 @@ function renderTabs() {
     var wrap = document.createElement('div');
     wrap.className = 'tab-wrap';
 
+    var isEnded = !!cat.ended_at;
     var btn = document.createElement('button');
-    btn.className = 'tab' + (cat.id === currentCategoryId ? ' active' : '');
+    btn.className = 'tab' + (cat.id === currentCategoryId ? ' active' : '') + (isEnded ? ' ended' : '');
     btn.textContent = cat.name;
+    btn.title = isEnded ? '该分类已结束，下个月起不再显示' : '';
     btn.onclick = function() { switchCategory(cat.id); };
 
     // Show pending count badge
@@ -177,7 +189,7 @@ function renderTabs() {
     btn.addEventListener('contextmenu', function(e) {
       e.preventDefault();
       e.stopPropagation();
-      openMoveCatTopicModal(cat);
+      openCategoryContextMenu(cat, e.clientX, e.clientY);
     });
 
     if (idx > 0) {
@@ -277,3 +289,92 @@ async function switchCategory(id) {
   updateBulkBar();
   await loadTasks(id);
 }
+
+// ---------- Category context menu ----------
+
+function openCategoryContextMenu(cat, x, y) {
+  closeCategoryContextMenu();
+
+  var menu = document.createElement('div');
+  menu.id = 'categoryContextMenu';
+  menu.className = 'category-context-menu';
+  menu.style.left = x + 'px';
+  menu.style.top = y + 'px';
+
+  var items = [];
+
+  items.push({
+    label: '切换专题',
+    action: function() { openMoveCatTopicModal(cat); }
+  });
+
+  if (cat.ended_at) {
+    items.push({
+      label: '重新启用分类',
+      action: async function() {
+        await window.electronAPI.reopenCategory(cat.id);
+        await loadCategories(currentTopicId);
+        showToast('分类已重新启用', 'success');
+      }
+    });
+  } else {
+    items.push({
+      label: '结束分类',
+      action: async function() {
+        if (!confirm('确定结束分类"' + cat.name + '"? 结束后该分类将在下个月起不再显示，但本月仍可查看和填报。')) return;
+        await window.electronAPI.endCategory(cat.id);
+        await loadCategories(currentTopicId);
+        showToast('分类已结束，下个月起不再显示', 'success');
+      }
+    });
+  }
+
+  items.push({
+    label: '删除分类',
+    danger: true,
+    action: function() {
+      if (confirm('确定删除分类"' + cat.name + '"? 该分类下的所有任务、阶段及填报数据将被一并删除。')) {
+        doDeleteCategory(cat.id);
+      }
+    }
+  });
+
+  items.forEach(function(item) {
+    var row = document.createElement('div');
+    row.className = 'category-context-menu-item' + (item.danger ? ' danger' : '');
+    row.textContent = item.label;
+    row.onclick = function(e) {
+      e.stopPropagation();
+      closeCategoryContextMenu();
+      item.action();
+    };
+    menu.appendChild(row);
+  });
+
+  document.body.appendChild(menu);
+
+  // Adjust if menu goes off screen
+  var rect = menu.getBoundingClientRect();
+  if (rect.right > window.innerWidth) {
+    menu.style.left = (window.innerWidth - rect.width - 8) + 'px';
+  }
+  if (rect.bottom > window.innerHeight) {
+    menu.style.top = (window.innerHeight - rect.height - 8) + 'px';
+  }
+}
+
+function closeCategoryContextMenu() {
+  var existing = $('categoryContextMenu');
+  if (existing) existing.remove();
+}
+
+document.addEventListener('click', function(e) {
+  var menu = $('categoryContextMenu');
+  if (menu && !menu.contains(e.target)) {
+    closeCategoryContextMenu();
+  }
+});
+
+document.addEventListener('keydown', function(e) {
+  if (e.key === 'Escape') closeCategoryContextMenu();
+});

@@ -1,13 +1,13 @@
 // Category CRUD operations
 
-const { SHEETS, HEADERS } = require('./core');
+const { SHEETS } = require('./core');
 
 module.exports = {
   getCategories: function(topicId) {
     const topics = this.getTopics();
     const firstTopicId = topics.length > 0 ? topics[0].id : null;
     let all = this._sheetToJson(SHEETS.categories).map(function(r) {
-      return { id: r[0], name: r[1], is_routine: r[2], sort_order: r[3], created_at: r[4], topic_id: r[5] || firstTopicId };
+      return { id: r[0], name: r[1], is_routine: r[2], sort_order: r[3], created_at: r[4], topic_id: r[5] || firstTopicId, ended_at: r[6] || '' };
     });
     if (topicId !== undefined && topicId !== null) {
       all = all.filter(function(c) { return c.topic_id == topicId; });
@@ -19,7 +19,7 @@ module.exports = {
     const cats = this.getCategories();
     const maxOrder = cats.length ? Math.max.apply(null, cats.map(function(c) { return c.sort_order; })) : -1;
     const id = this._nextId('category');
-    this._appendRows(SHEETS.categories, [[id, name, isRoutine ? 1 : 0, maxOrder + 1, new Date().toISOString(), topicId]]);
+    this._appendRows(SHEETS.categories, [[id, name, isRoutine ? 1 : 0, maxOrder + 1, new Date().toISOString(), topicId, '']]);
     this.save();
     return id;
   },
@@ -32,7 +32,7 @@ module.exports = {
     if (isRoutine !== undefined) cats[idx].is_routine = isRoutine ? 1 : 0;
     if (topicId !== undefined) cats[idx].topic_id = topicId;
     this._replaceSheet(SHEETS.categories, cats.map(function(c) {
-      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id];
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
     }));
     this.save();
     return true;
@@ -48,7 +48,31 @@ module.exports = {
     cats[idx].sort_order = cats[targetIdx].sort_order;
     cats[targetIdx].sort_order = tmp;
     this._replaceSheet(SHEETS.categories, cats.map(function(c) {
-      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id];
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
+    }));
+    this.save();
+    return true;
+  },
+
+  endCategory: function(id) {
+    const cats = this.getCategories();
+    const idx = cats.findIndex(function(c) { return c.id === id; });
+    if (idx < 0) return false;
+    cats[idx].ended_at = new Date().toISOString();
+    this._replaceSheet(SHEETS.categories, cats.map(function(c) {
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
+    }));
+    this.save();
+    return true;
+  },
+
+  reopenCategory: function(id) {
+    const cats = this.getCategories();
+    const idx = cats.findIndex(function(c) { return c.id === id; });
+    if (idx < 0) return false;
+    cats[idx].ended_at = '';
+    this._replaceSheet(SHEETS.categories, cats.map(function(c) {
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
     }));
     this.save();
     return true;
@@ -73,7 +97,7 @@ module.exports = {
 
     const cats = this.getCategories().filter(function(c) { return c.id !== id; });
     this._replaceSheet(SHEETS.categories, cats.map(function(c) {
-      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id];
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
     }));
     this.save();
   }

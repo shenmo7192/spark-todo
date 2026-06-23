@@ -48,6 +48,12 @@ module.exports = {
   },
 
   checkRoutineUnfilled: function(categoryId, yearMonth) {
+    const category = this.getCategories().find(function(c) { return c.id == categoryId; });
+    if (category && category.ended_at) {
+      const endedYm = category.ended_at.substring(0, 7);
+      if (yearMonth > endedYm) return [];
+    }
+
     const routineTasks = this.getRoutineTasksByCategory(categoryId);
     const parts = yearMonth.split('-').map(Number);
     const lastM = parts[1] === 1 ? 12 : parts[1] - 1;
