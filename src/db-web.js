@@ -170,6 +170,13 @@ class IndexedDBStorage {
   async endCategory(id) {
     const cat = await this._get('categories', id);
     if (!cat) return false;
+
+    const allTasks = await this._getAll('tasks');
+    const hasUncompleted = allTasks.some(t => t.category_id === id && t.status !== 'completed');
+    if (hasUncompleted) {
+      throw new Error('该分类下还有未结束的任务，请先完成或结束所有任务后再结束分类');
+    }
+
     cat.ended_at = new Date().toISOString();
     await this._put('categories', cat);
     return true;
@@ -323,17 +330,27 @@ class IndexedDBStorage {
   async changeTaskCategory(taskId, newCategoryId) {
     const task = await this._get('tasks', taskId);
     if (!task) return;
+    const cats = await this.getCategories();
+    const targetCat = cats.find(c => c.id === newCategoryId);
+    if (targetCat && targetCat.ended_at && task.status !== 'completed') {
+      throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
+    }
     task.category_id = newCategoryId;
     await this._put('tasks', task);
   }
 
   async bulkChangeTaskCategory(taskIds, newCategoryId) {
+    const cats = await this.getCategories();
+    const targetCat = cats.find(c => c.id === newCategoryId);
+    const allTasks = await this._getAll('tasks');
     for (const tid of taskIds) {
-      const task = await this._get('tasks', tid);
-      if (task) {
-        task.category_id = newCategoryId;
-        await this._put('tasks', task);
+      const task = allTasks.find(t => t.id === tid);
+      if (!task) continue;
+      if (targetCat && targetCat.ended_at && task.status !== 'completed') {
+        throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
       }
+      task.category_id = newCategoryId;
+      await this._put('tasks', task);
     }
   }
 

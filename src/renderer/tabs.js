@@ -24,9 +24,35 @@ async function loadTopics() {
 function renderTopicTabs() {
   var bar = $('topicBar');
   bar.innerHTML = '';
-  topics.forEach(function(topic) {
+  topics.forEach(function(topic, idx) {
     var wrap = document.createElement('div');
     wrap.className = 'topic-wrap';
+
+    if (idx > 0) {
+      var leftBtn = document.createElement('button');
+      leftBtn.className = 'tab-arrow topic-arrow-left';
+      leftBtn.innerHTML = '&#9664;';
+      leftBtn.title = '向左移动';
+      leftBtn.onclick = async function(e) {
+        e.stopPropagation();
+        await window.electronAPI.moveTopic(topic.id, -1);
+        await loadTopics();
+      };
+      wrap.appendChild(leftBtn);
+    }
+
+    if (idx < topics.length - 1) {
+      var rightBtn = document.createElement('button');
+      rightBtn.className = 'tab-arrow topic-arrow-right';
+      rightBtn.innerHTML = '&#9654;';
+      rightBtn.title = '向右移动';
+      rightBtn.onclick = async function(e) {
+        e.stopPropagation();
+        await window.electronAPI.moveTopic(topic.id, 1);
+        await loadTopics();
+      };
+      wrap.appendChild(rightBtn);
+    }
 
     var btn = document.createElement('button');
     btn.className = 'topic' + (topic.id === currentTopicId ? ' active' : '');
@@ -321,10 +347,14 @@ function openCategoryContextMenu(cat, x, y) {
     items.push({
       label: '结束分类',
       action: async function() {
-        if (!confirm('确定结束分类"' + cat.name + '"? 结束后该分类将在下个月起不再显示，但本月仍可查看和填报。')) return;
-        await window.electronAPI.endCategory(cat.id);
-        await loadCategories(currentTopicId);
-        showToast('分类已结束，下个月起不再显示', 'success');
+        if (!confirm('确定结束分类"' + cat.name + '"? 结束后该分类将在下个月起不再显示。\n\n注意：仅当分类下所有任务都已结束时才能结束分类。')) return;
+        try {
+          await window.electronAPI.endCategory(cat.id);
+          await loadCategories(currentTopicId);
+          showToast('分类已结束，下个月起不再显示', 'success');
+        } catch (e) {
+          alert(e.message || '结束分类失败');
+        }
       }
     });
   }

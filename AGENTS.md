@@ -65,6 +65,7 @@ data/todo.xlsx (Excel 文件)
   - `stages` – 非日常任务的阶段记录（id, task_id, stage_index, note, progress_value, created_at, updated_at）
   - `routine_records` – 日常工作的月度填报记录（id, task_id, year_month, quantity, filled_at）
 - **关键方法**: `getCategories`, `addCategory`, `updateCategory`, `endCategory`, `reopenCategory`, `getTasks`, `getTaskById`, `addTask`, `updateTask`, `deleteTask`, `addStage`, `fillRoutine`, `checkRoutineUnfilled`, `getExportData`
+- 专题（Topic）支持 `addTopic`, `updateTopic`, `moveTopic`, `deleteTopic`
 
 #### `Exporter` (export.js)
 - **职责**: 将任务数据按年月分 Sheet 导出为标准台账 Excel
@@ -82,7 +83,7 @@ data/todo.xlsx (Excel 文件)
 - 支持**动态添加/删除**分类（Tab 栏可配）
 - 分类可标记为 `is_routine`（日常工作型）或 `is_routine=0`（普通 TODO 型）
 - 分类隶属于**专题（Topic）**，可右键切换所属专题
-- 支持**右键结束/重新启用分类**：结束后的分类在结束当月仍可见可填报，下个月起自动从 Tab 栏隐藏，且不再参与日常工作的未填报提醒
+- 支持**右键结束/重新启用分类**：只有当分类下所有任务都已结束时，才能结束该分类；结束后的分类在结束当月仍可见可填报，下个月起自动从 Tab 栏隐藏，且不再参与日常工作的未填报提醒；向已结束分类移动未结束任务时会被拒绝并提示先重新打开任务
 - 在 Tab 间切换时加载对应分类的任务列表
 
 ### 2. 任务管理

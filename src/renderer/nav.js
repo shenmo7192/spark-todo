@@ -314,11 +314,15 @@ $('bulkMoveModalOverlay').onclick = function(e) { if (e.target === $('bulkMoveMo
 $('btnConfirmBulkMove').onclick = async function() {
   var newCategoryId = parseInt($('bulkMoveCategory').value);
   if (!newCategoryId) return;
-  await window.electronAPI.bulkChangeTaskCategory(Array.from(selectedTaskIds), newCategoryId);
-  selectedTaskIds.clear();
-  updateBulkBar();
-  closeBulkMoveModal();
-  await loadTasks(currentCategoryId);
+  try {
+    await window.electronAPI.bulkChangeTaskCategory(Array.from(selectedTaskIds), newCategoryId);
+    selectedTaskIds.clear();
+    updateBulkBar();
+    closeBulkMoveModal();
+    await loadTasks(currentCategoryId);
+  } catch (e) {
+    alert(e.message || '批量切换分类失败');
+  }
 };
 
 // ---------- Overview modal ----------

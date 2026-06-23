@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTopics: () => ipcRenderer.invoke('db:getTopics'),
   addTopic: (name) => ipcRenderer.invoke('db:addTopic', name),
   updateTopic: (id, name) => ipcRenderer.invoke('db:updateTopic', id, name),
+  moveTopic: (id, direction) => ipcRenderer.invoke('db:moveTopic', id, direction),
   deleteTopic: (id) => ipcRenderer.invoke('db:deleteTopic', id),
 
   // Categories

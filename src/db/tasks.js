@@ -158,6 +158,10 @@ module.exports = {
     const taskIsRoutine = parseInt(rows[idx][6]) || 0;
     if (taskIsRoutine !== newIsRoutine) return;
 
+    if (targetCat.ended_at && rows[idx][4] !== 'completed') {
+      throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
+    }
+
     rows[idx][1] = newCategoryId;
     rows[idx][6] = newIsRoutine;
     this._replaceSheet(SHEETS.tasks, rows);
@@ -176,6 +180,9 @@ module.exports = {
       if (taskIds.includes(row[0])) {
         const taskIsRoutine = parseInt(row[6]) || 0;
         if (taskIsRoutine !== newIsRoutine) continue;
+        if (targetCat.ended_at && row[4] !== 'completed') {
+          throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
+        }
         row[1] = newCategoryId;
         row[6] = newIsRoutine;
       }

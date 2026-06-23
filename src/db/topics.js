@@ -1,6 +1,6 @@
 // Topic CRUD operations
 
-const { SHEETS, HEADERS } = require('./core');
+const { SHEETS } = require('./core');
 
 module.exports = {
   getTopics: function() {
@@ -30,6 +30,22 @@ module.exports = {
     return true;
   },
 
+  moveTopic: function(id, direction) {
+    const topics = this.getTopics();
+    const idx = topics.findIndex(function(t) { return t.id === id; });
+    if (idx < 0) return false;
+    const targetIdx = idx + direction;
+    if (targetIdx < 0 || targetIdx >= topics.length) return false;
+    const tmp = topics[idx].sort_order;
+    topics[idx].sort_order = topics[targetIdx].sort_order;
+    topics[targetIdx].sort_order = tmp;
+    this._replaceSheet(SHEETS.topics, topics.map(function(t) {
+      return [t.id, t.name, t.sort_order, t.created_at];
+    }));
+    this.save();
+    return true;
+  },
+
   deleteTopic: function(id) {
     const topics = this.getTopics();
     if (topics.length <= 1) throw new Error('至少保留一个专题');
@@ -41,7 +57,7 @@ module.exports = {
       return c;
     });
     this._replaceSheet(SHEETS.categories, updatedCats.map(function(c) {
-      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id];
+      return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
     }));
     this._replaceSheet(SHEETS.topics, remaining.map(function(t) {
       return [t.id, t.name, t.sort_order, t.created_at];

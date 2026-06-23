@@ -58,6 +58,15 @@ module.exports = {
     const cats = this.getCategories();
     const idx = cats.findIndex(function(c) { return c.id === id; });
     if (idx < 0) return false;
+
+    // Can only end a category when all its tasks are already completed
+    const uncompleted = this._sheetToJson(SHEETS.tasks).filter(function(r) {
+      return r[1] == id && r[4] !== 'completed';
+    });
+    if (uncompleted.length > 0) {
+      throw new Error('该分类下还有未结束的任务，请先完成或结束所有任务后再结束分类');
+    }
+
     cats[idx].ended_at = new Date().toISOString();
     this._replaceSheet(SHEETS.categories, cats.map(function(c) {
       return [c.id, c.name, c.is_routine, c.sort_order, c.created_at, c.topic_id, c.ended_at || ''];
