@@ -57,7 +57,7 @@ function exportExcelDB(targetPath) {
 
   const arraySheets = [
     { name: 'topics', headers: ['id', 'name', 'sort_order', 'created_at'], data: allTopics },
-    { name: 'categories', headers: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'], data: allCategories },
+    { name: 'categories', headers: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id', 'ended_at'], data: allCategories },
     { name: 'tasks', headers: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'], data: allTasks },
     { name: 'stages', headers: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'], data: allStages },
     { name: 'routine_records', headers: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'], data: allRoutines }
@@ -84,7 +84,7 @@ function importExcelDB(filePath, mode) {
 }
 
 const SHEET_HEADERS = {
-  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'],
+  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id', 'ended_at'],
   tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'],
   stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
   routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'],

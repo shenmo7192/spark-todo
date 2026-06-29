@@ -128,6 +128,7 @@ function safeHandler(fn) {
 ipcMain.handle('db:getTopics', safeHandler(() => db.getTopics()));
 ipcMain.handle('db:addTopic', safeHandler((_, name) => db.addTopic(name)));
 ipcMain.handle('db:updateTopic', safeHandler((_, id, name) => db.updateTopic(id, name)));
+ipcMain.handle('db:moveTopic', safeHandler((_, id, direction) => db.moveTopic(id, direction)));
 ipcMain.handle('db:deleteTopic', safeHandler((_, id) => db.deleteTopic(id)));
 
 ipcMain.handle('db:getCategories', safeHandler((_, topicId) => db.getCategories(topicId)));
@@ -135,6 +136,8 @@ ipcMain.handle('db:addCategory', safeHandler((_, name, isRoutine, topicId) => db
 ipcMain.handle('db:updateCategory', safeHandler((_, id, name, isRoutine, topicId) => db.updateCategory(id, name, isRoutine, topicId)));
 ipcMain.handle('db:moveCategory', safeHandler((_, id, direction) => db.moveCategory(id, direction)));
 ipcMain.handle('db:deleteCategory', safeHandler((_, id) => db.deleteCategory(id)));
+ipcMain.handle('db:endCategory', safeHandler((_, id) => db.endCategory(id)));
+ipcMain.handle('db:reopenCategory', safeHandler((_, id) => db.reopenCategory(id)));
 
 ipcMain.handle('db:getTasks', safeHandler((_, categoryId, yearMonth) => db.getTasks(categoryId, yearMonth)));
 ipcMain.handle('db:getTaskById', safeHandler((_, taskId) => db.getTaskById(taskId)));

@@ -446,7 +446,12 @@ async function saveAndCloseTaskModal() {
     var allCats = await window.electronAPI.getCategories();
     var targetCat = allCats.find(function(c) { return c.id === newCategoryId; });
     if (targetCat && targetCat.is_routine === openedTask.is_routine) {
-      await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
+      try {
+        await window.electronAPI.changeTaskCategory(openedTask.id, newCategoryId);
+      } catch (e) {
+        alert(e.message || '切换分类失败');
+        $('taskCategory').value = openedTask.category_id;
+      }
     }
   }
 

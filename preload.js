@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getTopics: () => ipcRenderer.invoke('db:getTopics'),
   addTopic: (name) => ipcRenderer.invoke('db:addTopic', name),
   updateTopic: (id, name) => ipcRenderer.invoke('db:updateTopic', id, name),
+  moveTopic: (id, direction) => ipcRenderer.invoke('db:moveTopic', id, direction),
   deleteTopic: (id) => ipcRenderer.invoke('db:deleteTopic', id),
 
   // Categories
@@ -13,6 +14,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   updateCategory: (id, name, isRoutine, topicId) => ipcRenderer.invoke('db:updateCategory', id, name, isRoutine, topicId),
   moveCategory: (id, direction) => ipcRenderer.invoke('db:moveCategory', id, direction),
   deleteCategory: (id) => ipcRenderer.invoke('db:deleteCategory', id),
+  endCategory: (id) => ipcRenderer.invoke('db:endCategory', id),
+  reopenCategory: (id) => ipcRenderer.invoke('db:reopenCategory', id),
 
   // Tasks
   getTasks: (categoryId, yearMonth) => ipcRenderer.invoke('db:getTasks', categoryId, yearMonth),

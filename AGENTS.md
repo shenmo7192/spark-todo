@@ -22,17 +22,20 @@ Spark Todo 是一个用于个人/团队工作台账管理的桌面应用，支�
 
 ```
 spark-todo/
-├── main.js          # Electron 主进程：窗口创建 + IPC 调度
-├── preload.js       # contextBridge API 暴露给渲染进程
-├── db.js            # Excel 文件读写层（模拟 CRUD 数据库）
-├── export.js        # 台账导出逻辑（按年月分 Sheet）
-├── index.html       # 前端 UI（弹窗、卡片、Tab）
-├── renderer.js      # 前端交互逻辑（DOM 操作、数据渲染）
-├── styles.css       # 样式（CSS Variables、动画）
-├── package.json     # 依赖与构建配置
-├── data/            # 运行时生成的 Excel 数据库文件
+├── main.js               # Electron 主进程：窗口创建 + IPC 调度
+├── preload.js            # contextBridge API 暴露给渲染进程
+├── db.js                 # ExcelDB 入口，组合 src/db/ 各模块
+├── export.js             # Exporter 入口
+├── index.html            # 前端 UI（弹窗、卡片、Tab）
+├── styles.css            # 样式（CSS Variables、动画）
+├── package.json          # 依赖与构建配置
+├── src/
+│   ├── db/               # 数据层：core、categories、tasks、stages、routine、export-data
+│   ├── export/           # 导出层：ledger、kanban、db-io
+│   └── renderer/         # 前端交互：tabs、tasks、modal、nav、buttons、state
+├── data/                 # 运行时生成的 Excel 数据库文件
 │   └── todo.xlsx
-└── assets/          # 图标等静态资源
+└── assets/               # 图标等静态资源
 ```
 
 ---
@@ -42,11 +45,11 @@ spark-todo/
 ### 数据流
 
 ```
-renderer.js (UI层)
+src/renderer/*.js (UI层)
     ↓ 通过 preload.js 暴露的 electronAPI
 main.js (IPC 调度)
     ↓ 按 handler 路由
-db.js (数据层: ExcelDB 类)
+src/db/*.js (数据层: ExcelDB 类)
     ↓ xlsx 读写
 data/todo.xlsx (Excel 文件)
 ```
@@ -57,11 +60,12 @@ data/todo.xlsx (Excel 文件)
 - **职责**: 将 Excel 的 5 个 Sheet 当作关系型数据库的表来操作
 - **Sheet 结构**:
   - `meta` – 键值对元数据（自增 ID 计数器等）
-  - `categories` – 事务分类（id, name, is_routine, sort_order, created_at）
+  - `categories` – 事务分类（id, name, is_routine, sort_order, created_at, topic_id, ended_at）
   - `tasks` – 任务主表（id, category_id, title, description, status, progress, is_routine, created_at, started_at, completed_at）
   - `stages` – 非日常任务的阶段记录（id, task_id, stage_index, note, progress_value, created_at, updated_at）
   - `routine_records` – 日常工作的月度填报记录（id, task_id, year_month, quantity, filled_at）
-- **关键方法**: `getCategories`, `addCategory`, `getTasks`, `getTaskById`, `addTask`, `updateTask`, `deleteTask`, `addStage`, `fillRoutine`, `checkRoutineUnfilled`, `getExportData`
+- **关键方法**: `getCategories`, `addCategory`, `updateCategory`, `endCategory`, `reopenCategory`, `getTasks`, `getTaskById`, `addTask`, `updateTask`, `deleteTask`, `addStage`, `fillRoutine`, `checkRoutineUnfilled`, `getExportData`
+- 专题（Topic）支持 `addTopic`, `updateTopic`, `moveTopic`, `deleteTopic`
 
 #### `Exporter` (export.js)
 - **职责**: 将任务数据按年月分 Sheet 导出为标准台账 Excel
@@ -75,9 +79,11 @@ data/todo.xlsx (Excel 文件)
 ## 功能清单
 
 ### 1. 事务分类管理
-- 预设分类: "日常工作"、"其他工作"
+- 预设分类: "工作任务"、"日常工作"
 - 支持**动态添加/删除**分类（Tab 栏可配）
 - 分类可标记为 `is_routine`（日常工作型）或 `is_routine=0`（普通 TODO 型）
+- 分类隶属于**专题（Topic）**，可右键切换所属专题
+- 支持**右键结束/重新启用分类**：只有当分类下所有任务都已结束时，才能结束该分类；结束后的分类在结束当月仍可见可填报，下个月起自动从 Tab 栏隐藏，且不再参与日常工作的未填报提醒；向已结束分类移动未结束任务时会被拒绝并提示先重新打开任务
 - 在 Tab 间切换时加载对应分类的任务列表
 
 ### 2. 任务管理
@@ -145,17 +151,17 @@ npm start
 
 ### 代码约定
 
-- **UI 层** (`renderer.js`): 使用原生 DOM API，无框架依赖；`$` 函数是 `document.getElementById` 的简写
-- **数据库层** (`db.js`): 使用 `_sheetToJson` 将 Sheet 转为二维数组，`_replaceSheet` 重写整个 Sheet；每次写操作后调用 `this.save()`
-- **导出层** (`export.js`): 基于 `xlsx.utils.book_new()` / `aoa_to_sheet()` / `book_append_sheet()` 构建多 Sheet 工作簿
+- **UI 层** (`src/renderer/*.js`): 使用原生 DOM API，无框架依赖；`$` 函数是 `document.getElementById` 的简写
+- **数据库层** (`src/db/*.js`): 使用 `_sheetToJson` 将 Sheet 转为二维数组，`_replaceSheet` 重写整个 Sheet；每次写操作后调用 `this.save()`
+- **导出层** (`src/export/*.js`): 基于 `xlsx.utils.book_new()` / `aoa_to_sheet()` / `book_append_sheet()` 构建多 Sheet 工作簿
 - **IPC 通道**: 所有 `ipcMain.handle` 注册在 `main.js`，使用 `safeHandler` 包装器统一错误处理；`preload.js` 统一暴露给渲染进程
 
 ### 添加新功能
 
-1. **新数据字段**: 修改 `db.js` 对应 Sheet headers 和方法
+1. **新数据字段**: 修改 `src/db/core.js` 对应 Sheet headers 和方法，并在 `src/db/` 相关模块实现业务逻辑
 2. **新 IPC 接口**: 在 `main.js` 添加 `ipcMain.handle`，在 `preload.js` 添加对应方法
-3. **新 UI**: 在 `index.html` 添加结构，`renderer.js` 添加逻辑，`styles.css` 添加样式
-4. **新导出逻辑**: 在 `export.js` 的 `_exportXxxRow` 方法族中扩展
+3. **新 UI**: 在 `index.html` 添加结构，`src/renderer/*.js` 添加逻辑，`styles.css` 添加样式
+4. **新导出逻辑**: 在 `src/export/` 的对应方法族中扩展
 
 ---
 
@@ -163,7 +169,7 @@ npm start
 
 以下需求为项目的目标形态，当前部分已实现（标记 ✅），部分待开发：
 
-- ✅ 事务分类（可配置 Tab，可点击新增）
+- ✅ 事务分类（可配置 Tab，可点击新增，支持结束/重新启用）
 - ✅ 弹窗展示当前进度，支持多次迭代更新
 - ✅ 阶段自动切分完成度百分比
 - ✅ 阶段按时间倒序展示

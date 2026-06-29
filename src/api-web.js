@@ -367,6 +367,8 @@
     updateCategory: (id, name, isRoutine) => db.ready.then(() => db.updateCategory(id, name, isRoutine)),
     moveCategory: (id, direction) => db.ready.then(() => db.moveCategory(id, direction)),
     deleteCategory: (id) => db.ready.then(() => db.deleteCategory(id)),
+    endCategory: (id) => db.ready.then(() => db.endCategory(id)),
+    reopenCategory: (id) => db.ready.then(() => db.reopenCategory(id)),
 
     getTasks: (categoryId, yearMonth) => db.ready.then(() => db.getTasks(categoryId, yearMonth)),
     getTaskById: (taskId) => db.ready.then(() => db.getTaskById(taskId)),
@@ -414,6 +416,8 @@
       updateCategory: () => Promise.resolve(false),
       moveCategory: () => Promise.resolve(false),
       deleteCategory: () => Promise.resolve(),
+      endCategory: () => Promise.resolve(false),
+      reopenCategory: () => Promise.resolve(false),
       getTasks: () => Promise.resolve([]),
       getTaskById: () => Promise.resolve(null),
       addTask: () => Promise.reject(new Error('存储未初始化: ' + e.message)),

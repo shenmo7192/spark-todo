@@ -17,7 +17,7 @@ const SHEETS = {
 const HEADERS = {
   meta: ['key', 'value'],
   topics: ['id', 'name', 'sort_order', 'created_at'],
-  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id'],
+  categories: ['id', 'name', 'is_routine', 'sort_order', 'created_at', 'topic_id', 'ended_at'],
   tasks: ['id', 'category_id', 'title', 'description', 'status', 'progress', 'is_routine', 'created_at', 'started_at', 'completed_at', 'sort_order', 'importance', 'manual_duration', 'contact_person'],
   stages: ['id', 'task_id', 'stage_index', 'note', 'progress_value', 'created_at', 'updated_at', 'is_completed'],
   routine_records: ['id', 'task_id', 'year_month', 'quantity', 'filled_at'],
@@ -42,6 +42,7 @@ module.exports = {
       this._migrateStageCompleted();
       this._migrateTopics();
       this._migrateTaskFields();
+      this._migrateCategoryEndedAt();
     } else {
       this.workbook = xlsx.utils.book_new();
       for (const name of Object.values(SHEETS)) {
@@ -55,8 +56,8 @@ module.exports = {
       ]);
       this._setMeta('last_topic_id', 3);
       this._appendRows(SHEETS.categories, [
-        [1, '工作任务', 0, 0, new Date().toISOString(), 1],
-        [2, '日常工作', 1, 1, new Date().toISOString(), 3]
+        [1, '工作任务', 0, 0, new Date().toISOString(), 1, ''],
+        [2, '日常工作', 1, 1, new Date().toISOString(), 3, '']
       ]);
       this._setMeta('last_category_id', 2);
       this._setMeta('last_task_id', 0);
@@ -229,6 +230,25 @@ module.exports = {
     }
     const newWs = xlsx.utils.aoa_to_sheet(allRows);
     this.workbook.Sheets[SHEETS.tasks] = newWs;
+    this.save();
+  },
+
+  _migrateCategoryEndedAt: function() {
+    const ws = this._getSheet(SHEETS.categories);
+    if (!ws) return;
+    const data = xlsx.utils.sheet_to_json(ws, { header: 1, defval: '' });
+    if (data.length < 1) return;
+    const headerRow = data[0];
+    if (headerRow.length >= HEADERS.categories.length) return;
+
+    const patched = [];
+    for (let i = 0; i < data.length; i++) {
+      const row = [...data[i]];
+      while (row.length < HEADERS.categories.length) row.push('');
+      patched.push(row);
+    }
+    const newWs = xlsx.utils.aoa_to_sheet(patched);
+    this.workbook.Sheets[SHEETS.categories] = newWs;
     this.save();
   },
 

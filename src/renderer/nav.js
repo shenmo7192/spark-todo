@@ -46,7 +46,7 @@ async function switchMonth(ym) {
   currentYearMonth = ym;
   $('yearSelect').value = ym.substring(0, 4);
   $('monthSelect').value = ym.substring(5);
-  await loadTasks(currentCategoryId);
+  await loadCategories(currentTopicId);
 }
 
 function switchMonthFromSelects() {
@@ -314,11 +314,15 @@ $('bulkMoveModalOverlay').onclick = function(e) { if (e.target === $('bulkMoveMo
 $('btnConfirmBulkMove').onclick = async function() {
   var newCategoryId = parseInt($('bulkMoveCategory').value);
   if (!newCategoryId) return;
-  await window.electronAPI.bulkChangeTaskCategory(Array.from(selectedTaskIds), newCategoryId);
-  selectedTaskIds.clear();
-  updateBulkBar();
-  closeBulkMoveModal();
-  await loadTasks(currentCategoryId);
+  try {
+    await window.electronAPI.bulkChangeTaskCategory(Array.from(selectedTaskIds), newCategoryId);
+    selectedTaskIds.clear();
+    updateBulkBar();
+    closeBulkMoveModal();
+    await loadTasks(currentCategoryId);
+  } catch (e) {
+    alert(e.message || '批量切换分类失败');
+  }
 };
 
 // ---------- Overview modal ----------
@@ -376,20 +380,22 @@ async function loadOverviewData() {
     var items = card.querySelectorAll('.overview-task-item');
     for (var ii = 0; ii < items.length; ii++) {
       var item = items[ii];
-      item.addEventListener('click', function(e) {
+      item.addEventListener('click', async function(e) {
         var tgt = e.currentTarget;
         var taskId = parseInt(tgt.dataset.taskId);
         var categoryId = parseInt(tgt.dataset.categoryId);
         var om = tgt.dataset.yearMonth;
         closeOverviewModal();
+        currentYearMonth = om;
+        $('yearSelect').value = om.substring(0, 4);
+        $('monthSelect').value = om.substring(5);
+        await loadCategories(currentTopicId);
         if (currentCategoryId !== categoryId) {
           currentCategoryId = categoryId;
           renderTabs();
         }
-        currentYearMonth = om;
-        $('yearSelect').value = om.substring(0, 4);
-        $('monthSelect').value = om.substring(5);
-        loadTasks(currentCategoryId).then(function() { openTaskModal(taskId); });
+        await loadTasks(currentCategoryId);
+        openTaskModal(taskId);
       });
     }
 
