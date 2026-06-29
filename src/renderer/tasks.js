@@ -81,15 +81,15 @@ function renderTasks() {
         if (stages[si].is_completed == 1) filledCount++;
       }
 
-      // 卡片上只展示最新一段已完成阶段的备注
+      // 卡片上展示第一个未完成阶段的备注（即下一步该做的事）
       var latestNoteHtml = '';
-      var revStages = stages.slice().reverse();
-      var newestFilledStage = null;
-      for (var rsi = 0; rsi < revStages.length; rsi++) {
-        if (revStages[rsi].is_completed == 1) { newestFilledStage = revStages[rsi]; break; }
+      var sortedStages = stages.slice().sort(function(a, b) { return a.stage_index - b.stage_index; });
+      var firstIncompleteStage = null;
+      for (var rsi = 0; rsi < sortedStages.length; rsi++) {
+        if (!sortedStages[rsi].is_completed) { firstIncompleteStage = sortedStages[rsi]; break; }
       }
-      if (newestFilledStage) {
-        latestNoteHtml = '<div class="task-latest-note">\u{1F4DD} 第' + newestFilledStage.stage_index + '段: ' + escapeHtml(newestFilledStage.note) + '</div>';
+      if (firstIncompleteStage) {
+        latestNoteHtml = '<div class="task-latest-note">\u{1F449} 第' + firstIncompleteStage.stage_index + '段待完成: ' + escapeHtml(firstIncompleteStage.note || '无备注') + '</div>';
       } else if (capturedTask.description) {
         latestNoteHtml = '<div class="task-latest-note">\u{1F4DD} ' + escapeHtml(capturedTask.description) + '</div>';
       }

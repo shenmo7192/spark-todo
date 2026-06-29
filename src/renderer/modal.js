@@ -243,15 +243,30 @@ function renderStages(task) {
     return;
   }
 
-  // Show next stage preview
-  var nextStageNum = stages.length + 1;
-  var completedCount = stages.filter(function(s) { return s.is_completed == 1; }).length;
-  var nextProgress = Math.round((completedCount + 1) / nextStageNum * 100);
+  // Show next stage preview: find the first incomplete stage
+  var stagesSorted = stages.slice().sort(function(a, b) { return a.stage_index - b.stage_index; });
+  var firstIncomplete = null;
+  for (var si = 0; si < stagesSorted.length; si++) {
+    if (!stagesSorted[si].is_completed) { firstIncomplete = stagesSorted[si]; break; }
+  }
+
   if (hintEl) {
     hintEl.style.display = 'block';
-    hintEl.innerHTML = '<span class="stage-next-icon">\u{1F449}</span> 下一阶段：<strong>第 ' + nextStageNum + ' 阶段</strong>'
-      + '（完成后进度将推进至 <strong>' + nextProgress + '%</strong>）'
-      + '<button class="btn-stage-next-jump" id="btnStageNextJump" title="直接跳到下一阶段">\u23ED\uFE0F 完成当前并进入下一阶段</button>';
+    if (firstIncomplete) {
+      // Show the first unfinished stage as the next thing to do
+      var afterProgress = Math.round((firstIncomplete.stage_index) / stages.length * 100);
+      hintEl.innerHTML = '<span class="stage-next-icon">\u{1F449}</span> 接下来应完成：<strong>第 ' + firstIncomplete.stage_index + ' 阶段</strong>'
+        + '（完成后进度将推进至 <strong>' + afterProgress + '%</strong>）'
+        + '<button class="btn-stage-next-jump" id="btnStageNextJump" title="完成当前阶段并进入下一阶段">\u23ED\uFE0F 完成当前阶段</button>';
+    } else {
+      // All stages completed — suggest adding a new one
+      var nextStageNum = stages.length + 1;
+      var completedCount = stages.length;
+      var nextProgress = Math.round((completedCount + 1) / nextStageNum * 100);
+      hintEl.innerHTML = '<span class="stage-next-icon">\u2705</span> 全部阶段已完成！可添加：<strong>第 ' + nextStageNum + ' 阶段</strong>'
+        + '（完成后进度将推进至 <strong>' + nextProgress + '%</strong>）'
+        + '<button class="btn-stage-next-jump" id="btnStageNextJump" title="进入下一阶段">\u2795 添加下一阶段</button>';
+    }
   }
 
   // Build stage items (display in reverse: newest/highest index first)
@@ -370,16 +385,21 @@ function renderStages(task) {
   if (jumpBtn) {
     jumpBtn.onclick = async function() {
       if (!openedTask) return;
-      // Complete all incomplete stages except the last one (if it's the newest)
       var stgs = openedTask.stages || [];
-      for (var i = 0; i < stgs.length; i++) {
-        if (!stgs[i].is_completed) {
-          await window.electronAPI.updateStage({ id: stgs[i].id, is_completed: 1 });
-        }
+      // Find the first incomplete stage
+      var stgsSorted = stgs.slice().sort(function(a, b) { return a.stage_index - b.stage_index; });
+      var firstInc = null;
+      for (var i = 0; i < stgsSorted.length; i++) {
+        if (!stgsSorted[i].is_completed) { firstInc = stgsSorted[i]; break; }
       }
-      // Add a new stage
-      await window.electronAPI.addStage({ taskId: openedTask.id, note: '' });
-      $('newStageNote').value = '';
+      if (firstInc) {
+        // Complete the first unfinished stage
+        await window.electronAPI.updateStage({ id: firstInc.id, is_completed: 1 });
+      } else {
+        // All completed — add a new stage
+        await window.electronAPI.addStage({ taskId: openedTask.id, note: '' });
+        $('newStageNote').value = '';
+      }
       await refreshOpenedTask();
       renderStages(openedTask);
       if (openedTask.status === 'created') {
