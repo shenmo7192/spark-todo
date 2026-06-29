@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
   addStage: (stage) => ipcRenderer.invoke('db:addStage', stage),
   updateStage: (stage) => ipcRenderer.invoke('db:updateStage', stage),
   deleteStage: (stageId) => ipcRenderer.invoke('db:deleteStage', stageId),
+  reorderStages: (taskId, stageIds) => ipcRenderer.invoke('db:reorderStages', taskId, stageIds),
 
   // Routine
   getRoutineRecord: (taskId, yearMonth) => ipcRenderer.invoke('db:getRoutineRecord', taskId, yearMonth),

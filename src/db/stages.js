@@ -89,5 +89,17 @@ module.exports = {
     }
 
     this.save();
+  },
+
+  reorderStages: function(taskId, stageIds) {
+    const allRows = this._sheetToJson(SHEETS.stages);
+    for (var i = 0; i < stageIds.length; i++) {
+      var idx = allRows.findIndex(function(r) { return r[0] == stageIds[i] && r[1] == taskId; });
+      if (idx >= 0) {
+        allRows[idx][2] = i + 1;
+      }
+    }
+    this._replaceSheet(SHEETS.stages, allRows);
+    this.save();
   }
 };

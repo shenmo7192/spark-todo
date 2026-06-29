@@ -146,6 +146,7 @@ ipcMain.handle('db:getStages', safeHandler((_, taskId) => db.getStages(taskId)))
 ipcMain.handle('db:addStage', safeHandler((_, stage) => db.addStage(stage)));
 ipcMain.handle('db:updateStage', safeHandler((_, stage) => db.updateStage(stage)));
 ipcMain.handle('db:deleteStage', safeHandler((_, stageId) => db.deleteStage(stageId)));
+ipcMain.handle('db:reorderStages', safeHandler((_, taskId, stageIds) => db.reorderStages(taskId, stageIds)));
 
 ipcMain.handle('db:getRoutineRecord', safeHandler((_, taskId, yearMonth) => db.getRoutineRecord(taskId, yearMonth)));
 ipcMain.handle('db:fillRoutine', safeHandler((_, record) => db.fillRoutine(record)));

@@ -235,14 +235,32 @@ function updateStatusButtons(status) {
 function renderStages(task) {
   var container = $('stageList');
   container.innerHTML = '';
+  var hintEl = $('stageNextHint');
   var stages = task.stages || [];
   if (stages.length === 0) {
     container.innerHTML = '<div class="empty-stages">暂无阶段，请在下方添加第一条阶段进度</div>';
+    if (hintEl) hintEl.style.display = 'none';
     return;
   }
+
+  // Show next stage preview
+  var nextStageNum = stages.length + 1;
+  var completedCount = stages.filter(function(s) { return s.is_completed == 1; }).length;
+  var nextProgress = Math.round((completedCount + 1) / nextStageNum * 100);
+  if (hintEl) {
+    hintEl.style.display = 'block';
+    hintEl.innerHTML = '<span class="stage-next-icon">\u{1F449}</span> 下一阶段：<strong>第 ' + nextStageNum + ' 阶段</strong>'
+      + '（完成后进度将推进至 <strong>' + nextProgress + '%</strong>）'
+      + '<button class="btn-stage-next-jump" id="btnStageNextJump" title="直接跳到下一阶段">\u23ED\uFE0F 完成当前并进入下一阶段</button>';
+  }
+
+  // Build stage items (display in reverse: newest/highest index first)
   stages.slice().reverse().forEach(function(s) {
     var div = document.createElement('div');
     div.className = 'stage-item';
+    div.draggable = true;
+    div.setAttribute('data-stage-id', s.id);
+
     var isLast = s.stage_index === stages.length;
     var isFirst = s.stage_index === 1;
     var isCompleted = s.is_completed == 1;
@@ -254,6 +272,7 @@ function renderStages(task) {
     var stageIndex = s.stage_index;
 
     div.innerHTML =
+      '<span class="stage-drag-handle" title="拖动排序">\u2630</span>' +
       '<div class="stage-item-main">' +
         '<div class="stage-index">第 ' + stageIndex + ' 阶段' + statusLabel + '</div>' +
         '<div class="stage-note" data-stage-id="' + sid + '" title="点击编辑备注">' + escapeHtml(s.note || '无备注') + '</div>' +
@@ -264,6 +283,53 @@ function renderStages(task) {
         '<span class="stage-check-mark">' + (isCompleted ? '\u2713' : '\u2014') + '</span>' +
       '</label>' +
       '<button class="btn-stage-delete" data-stage-id="' + sid + '" title="删除阶段">\u00D7</button>';
+
+    // Drag events
+    div.addEventListener('dragstart', function(e) {
+      e.dataTransfer.setData('text/plain', String(sid));
+      e.dataTransfer.effectAllowed = 'move';
+      div.classList.add('stage-dragging');
+    });
+    div.addEventListener('dragend', function(e) {
+      div.classList.remove('stage-dragging');
+      container.querySelectorAll('.stage-item').forEach(function(el) { el.classList.remove('stage-drag-over'); });
+    });
+    div.addEventListener('dragover', function(e) {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = 'move';
+      container.querySelectorAll('.stage-item').forEach(function(el) { el.classList.remove('stage-drag-over'); });
+      div.classList.add('stage-drag-over');
+    });
+    div.addEventListener('drop', async function(e) {
+      e.preventDefault();
+      div.classList.remove('stage-drag-over');
+      var draggedId = parseInt(e.dataTransfer.getData('text/plain'));
+      if (!draggedId || draggedId === sid) return;
+
+      // Get current display order (reversed stages: highest index first)
+      var items = container.querySelectorAll('.stage-item');
+      var idsInDisplayOrder = [];
+      for (var i = 0; i < items.length; i++) {
+        idsInDisplayOrder.push(parseInt(items[i].getAttribute('data-stage-id')));
+      }
+      // Remove dragged from its old position
+      var oldIdx = idsInDisplayOrder.indexOf(draggedId);
+      idsInDisplayOrder.splice(oldIdx, 1);
+      // Insert at drop position
+      var dropIdx = idsInDisplayOrder.indexOf(sid);
+      idsInDisplayOrder.splice(dropIdx, 0, draggedId);
+
+      // Convert display order (reverse-chronological) to stage_index order (ascending)
+      // Display order: newest first => stage_index should be descending when reading display order
+      // So reversed display order = ascending stage_index
+      var stageIndexOrder = idsInDisplayOrder.slice().reverse();
+
+      await window.electronAPI.reorderStages(openedTask.id, stageIndexOrder);
+      await refreshOpenedTask();
+      renderStages(openedTask);
+      updateStatusBadge(openedTask.status);
+      updateStatusButtons(openedTask.status);
+    });
 
     // Capture values in closure-safe manner using a wrapper
     (function(capturedId, capturedIndex, capturedIsCompleted) {
@@ -298,6 +364,33 @@ function renderStages(task) {
 
     container.appendChild(div);
   });
+
+  // Attach handler for "jump to next stage" button
+  var jumpBtn = $('btnStageNextJump');
+  if (jumpBtn) {
+    jumpBtn.onclick = async function() {
+      if (!openedTask) return;
+      // Complete all incomplete stages except the last one (if it's the newest)
+      var stgs = openedTask.stages || [];
+      for (var i = 0; i < stgs.length; i++) {
+        if (!stgs[i].is_completed) {
+          await window.electronAPI.updateStage({ id: stgs[i].id, is_completed: 1 });
+        }
+      }
+      // Add a new stage
+      await window.electronAPI.addStage({ taskId: openedTask.id, note: '' });
+      $('newStageNote').value = '';
+      await refreshOpenedTask();
+      renderStages(openedTask);
+      if (openedTask.status === 'created') {
+        updateStatusBadge('in_progress');
+        updateStatusButtons('in_progress');
+      } else {
+        updateStatusBadge(openedTask.status);
+        updateStatusButtons(openedTask.status);
+      }
+    };
+  }
 }
 
 function startStageNoteEdit(stage, el) {
