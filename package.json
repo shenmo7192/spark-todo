@@ -1,6 +1,6 @@
 {
   "name": "spark-todo",
-  "version": "1.5.0",
+  "version": "1.5.1",
   "description": "Todo 工单系统台账生成器",
   "main": "main.js",
   "scripts": {
@@ -12,8 +12,8 @@
   "devDependencies": {
     "@vitejs/plugin-vue": "^6.0.7",
     "concurrently": "^10.0.3",
-    "electron": "^42.4.0",
-    "electron-builder": "^26.15.3",
+    "electron": "^22.3.27",
+    "electron-builder": "^24.13.3",
     "vite": "^8.0.16",
     "vue": "^3.5.38",
     "wait-on": "^9.0.10"
