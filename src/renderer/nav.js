@@ -290,7 +290,11 @@ async function openBulkMoveModal() {
 
   for (var ti = 0; ti < allTopics.length; ti++) {
     var topic = allTopics[ti];
-    var topicCats = allCats.filter(function(c) { return c.topic_id === topic.id && c.is_routine == currentIsRoutine && c.id !== currentCategoryId; });
+    // 只提供当前期间可见的分类作为迁移目标，避免把任务迁移到已结束（当前不可见）的分类导致任务丢失
+    var topicCats = allCats.filter(function(c) {
+      return c.topic_id === topic.id && c.is_routine == currentIsRoutine && c.id !== currentCategoryId
+        && isCategoryVisibleForMonth(c, currentYearMonth);
+    });
     if (topicCats.length === 0) continue;
     var group = document.createElement('optgroup');
     group.label = topic.name;

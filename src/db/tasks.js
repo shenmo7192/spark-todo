@@ -2,6 +2,22 @@
 
 const { SHEETS } = require('./core');
 
+// 校验目标分类是否允许迁入任务：
+// - 目标分类若在上月或更早结束，当前期间已不可见，迁入会导致任务丢失，一律拒绝；
+// - 目标分类在当月结束（当月仍可见）时，仅允许迁入已完成的任务。
+function assertCanMoveToCategory(targetCat, taskStatus) {
+  if (!targetCat || !targetCat.ended_at) return;
+  const endedYm = targetCat.ended_at.substring(0, 7);
+  const now = new Date();
+  const nowYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+  if (endedYm < nowYm) {
+    throw new Error('目标分类已在上月或更早结束，当前期间不再显示，迁移后任务将不可见。请先重新启用该分类。');
+  }
+  if (taskStatus !== 'completed') {
+    throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
+  }
+}
+
 module.exports = {
   getTaskById: function(taskId) {
     const allTasks = this._sheetToJson(SHEETS.tasks).map(function(r) {
@@ -158,9 +174,7 @@ module.exports = {
     const taskIsRoutine = parseInt(rows[idx][6]) || 0;
     if (taskIsRoutine !== newIsRoutine) return;
 
-    if (targetCat.ended_at && rows[idx][4] !== 'completed') {
-      throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
-    }
+    assertCanMoveToCategory(targetCat, rows[idx][4]);
 
     rows[idx][1] = newCategoryId;
     rows[idx][6] = newIsRoutine;
@@ -180,9 +194,7 @@ module.exports = {
       if (taskIds.includes(row[0])) {
         const taskIsRoutine = parseInt(row[6]) || 0;
         if (taskIsRoutine !== newIsRoutine) continue;
-        if (targetCat.ended_at && row[4] !== 'completed') {
-          throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
-        }
+        assertCanMoveToCategory(targetCat, row[4]);
         row[1] = newCategoryId;
         row[6] = newIsRoutine;
       }

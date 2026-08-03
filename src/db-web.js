@@ -332,9 +332,8 @@ class IndexedDBStorage {
     if (!task) return;
     const cats = await this.getCategories();
     const targetCat = cats.find(c => c.id === newCategoryId);
-    if (targetCat && targetCat.ended_at && task.status !== 'completed') {
-      throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
-    }
+    if (!targetCat) return;
+    this._assertCanMoveToCategory(targetCat, task.status);
     task.category_id = newCategoryId;
     await this._put('tasks', task);
   }
@@ -342,15 +341,27 @@ class IndexedDBStorage {
   async bulkChangeTaskCategory(taskIds, newCategoryId) {
     const cats = await this.getCategories();
     const targetCat = cats.find(c => c.id === newCategoryId);
+    if (!targetCat) return;
     const allTasks = await this._getAll('tasks');
     for (const tid of taskIds) {
       const task = allTasks.find(t => t.id === tid);
       if (!task) continue;
-      if (targetCat && targetCat.ended_at && task.status !== 'completed') {
-        throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
-      }
+      this._assertCanMoveToCategory(targetCat, task.status);
       task.category_id = newCategoryId;
       await this._put('tasks', task);
+    }
+  }
+
+  _assertCanMoveToCategory(targetCat, taskStatus) {
+    if (!targetCat || !targetCat.ended_at) return;
+    const endedYm = targetCat.ended_at.substring(0, 7);
+    const now = new Date();
+    const nowYm = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    if (endedYm < nowYm) {
+      throw new Error('目标分类已在上月或更早结束，当前期间不再显示，迁移后任务将不可见。请先重新启用该分类。');
+    }
+    if (taskStatus !== 'completed') {
+      throw new Error('目标分类已结束，只能移动已完成的任务。请先将任务重新打开后再移动。');
     }
   }
 

@@ -13,6 +13,10 @@ function exportKanban(targetPath, fromMonth, toMonth, personInCharge) {
   const topicMap = {};
   for (const t of topcs) topicMap[t.id] = t;
 
+  // 日常任务：已经过去的月份视为已完成，进度记为 100%（仅影响日常任务）
+  const now = new Date();
+  const nowYm = now.getFullYear() + '-' + String(now.getMonth() + 1).padStart(2, '0');
+
   const headerRow = [
     '任务名称', '任务类型', '负责人', '完成情况', '进度',
     '进展描述', '工作量/交付物', '重要性', '开始时间', '结束时间',
@@ -35,7 +39,6 @@ function exportKanban(targetPath, fromMonth, toMonth, personInCharge) {
       const taskType = topic ? topic.name : '';
       const charge = personInCharge || '';
       const completionStatus = '';
-      const progress = '—';
       const progressDesc = task.description || '';
       const importance = task.importance || 1;
       const durationFormula = '';
@@ -44,6 +47,8 @@ function exportKanban(targetPath, fromMonth, toMonth, personInCharge) {
       const remarks = task.description || '';
 
       for (const rec of records) {
+        // 已过去的月份视为已完成，进度 100%
+        const progress = rec.year_month < nowYm ? '100%' : '—';
         rows.push([
           taskName, taskType, charge, completionStatus, progress,
           progressDesc, String(rec.quantity), importance,
